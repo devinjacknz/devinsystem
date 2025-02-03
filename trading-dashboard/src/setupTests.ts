@@ -63,7 +63,7 @@ class MockWebSocket implements WebSocket {
     });
   });
 
-  send = jest.fn((data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
+  send = jest.fn((_data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
     if (this.readyState !== MockWebSocket.OPEN) {
       throw new Error('WebSocket is not open');
     }
@@ -75,7 +75,9 @@ class MockWebSocket implements WebSocket {
       case 'open':
         this.onopen = handler as (event: Event) => void;
         if (this.readyState === MockWebSocket.OPEN) {
-          queueMicrotask(() => handler({ type: 'open', target: this }));
+          const event = new Event('open');
+          Object.defineProperty(event, 'target', { value: this });
+          queueMicrotask(() => handler(event));
         }
         break;
       case 'close':
