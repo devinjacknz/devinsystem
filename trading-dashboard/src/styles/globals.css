@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 px-4 py-2 rounded-md transition-colors;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent hover:bg-secondary px-4 py-2 rounded-md transition-colors;
+  }
+  
+  .card {
+    @apply bg-card text-card-foreground p-6 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow;
+  }
+  
+  .input {
+    @apply bg-background border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+  }
+  
+  .badge {
+    @apply px-2 py-1 text-xs font-medium rounded-full;
+  }
+  
+  .badge-success {
+    @apply bg-success/10 text-success;
+  }
+  
+  .badge-error {
+    @apply bg-destructive/10 text-destructive;
+  }
+  
+  .badge-neutral {
+    @apply bg-muted text-muted-foreground;
+  }
+  
+  .nav-item {
+    @apply px-4 py-2 rounded-md transition-colors hover:bg-secondary;
+  }
+  
+  .nav-item-active {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+}
