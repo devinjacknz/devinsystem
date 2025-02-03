@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { AIPrompt } from '../../types/ai';
+import { Button } from '../ui/button';
 import { useQuantitativeAnalysis } from '../../hooks/ai/useQuantitativeAnalysis';
+import { QuantitativeAnalysis } from '../../types/ai/prompts';
 
 interface AIPromptsProps {
   mode: 'dex' | 'pump';
@@ -45,15 +46,34 @@ export function AIPrompts({ mode, symbol }: AIPromptsProps) {
     );
   }
 
+  const handleRefresh = useCallback(() => {
+    refreshAnalysis();
+  }, [refreshAnalysis]);
+
   if (!analysis) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">No analysis available</p>
+          <Button onClick={handleRefresh} className="mt-4">
+            Refresh Analysis
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Quantitative Trading Analysis</CardTitle>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            Refresh
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

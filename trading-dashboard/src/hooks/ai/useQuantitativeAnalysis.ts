@@ -13,7 +13,7 @@ export function useQuantitativeAnalysis(data: QuantitativePrompt) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/api/v1/prompts/generate`, {
+        const response = await fetch(`${API_URL}/api/v1/ai/analyze`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -26,7 +26,11 @@ export function useQuantitativeAnalysis(data: QuantitativePrompt) {
         }
 
         const result = await response.json();
-        setAnalysis(result.analysis);
+        if (result.status === 'success') {
+          setAnalysis(result.analysis);
+        } else {
+          throw new Error(result.detail || 'Failed to analyze trading opportunity');
+        }
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Failed to fetch analysis');
       } finally {
@@ -34,8 +38,17 @@ export function useQuantitativeAnalysis(data: QuantitativePrompt) {
       }
     };
 
-    fetchAnalysis();
+    if (data.metrics.price > 0 && data.metrics.volume > 0) {
+      fetchAnalysis();
+    }
   }, [data]);
 
-  return { analysis, error, isLoading };
+  const refreshAnalysis = () => {
+    if (data.metrics.price > 0 && data.metrics.volume > 0) {
+      setAnalysis(null);
+      setError(null);
+    }
+  };
+
+  return { analysis, error, isLoading, refreshAnalysis };
 }
