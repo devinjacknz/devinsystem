@@ -31,5 +31,10 @@ func main() {
 
 	// Create and start server
 	server := api.NewServer(tradingEngine, walletManager, jwtSecret)
-	log.Fatal(http.ListenAndServe(":8080", server))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Starting server on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, server))
 }
