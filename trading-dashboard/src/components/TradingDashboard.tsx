@@ -180,8 +180,11 @@ export const TradingDashboard: React.FC<TradingDashboardProps> = memo(({
   const hasError = priceError || positionsError
   let error: Error | null = priceError || positionsError
   const isConnectionError = !isPriceConnected && !isPositionsConnected
-  if (isConnectionError && hasReachedMaxRetries) {
-    error = new Error('Connection lost to trading services')
+  if (isConnectionError) {
+    error = new Error('Connection lost to trading servers')
+  }
+  if (hasReachedMaxRetries) {
+    error = new Error('Max retries reached')
   }
   const isPartialConnection = (isPriceConnected && !isPositionsConnected) || (!isPriceConnected && isPositionsConnected)
 

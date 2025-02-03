@@ -1,7 +1,99 @@
 import '@testing-library/jest-dom'
+import { configure } from '@testing-library/react'
 import { cleanup } from '@testing-library/react'
 import React from 'react'
-import { configure } from '@testing-library/react'
+
+declare global {
+  interface Window {
+    env: {
+      VITE_API_URL: string;
+      VITE_WS_URL: string;
+    };
+  }
+  namespace NodeJS {
+    interface Global {
+      importMeta: {
+        env: {
+          VITE_API_URL: string;
+          MODE: string;
+        }
+      }
+    }
+  }
+}
+
+configure({
+  testIdAttribute: 'data-testid',
+  asyncUtilTimeout: 30000
+})
+
+jest.mock('./hooks/websocket/useWebSocket')
+jest.mock('./hooks/wallet/useWallet')
+jest.mock('./hooks/ai/useAIAnalysis')
+jest.mock('./hooks/auth/useAuth')
+
+process.env.VITE_API_URL = 'http://localhost:8080'
+process.env.MODE = 'test'
+
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: jest.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+})
+
+Object.defineProperty(window, 'env', {
+  writable: true,
+  configurable: true,
+  value: {
+    VITE_API_URL: 'http://localhost:8080',
+    VITE_WS_URL: 'ws://localhost:8080',
+  },
+})
+
+window.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}))
+
+window.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}))
+
+// Setup Vite environment
+(global as any).import = {
+  meta: {
+    env: {
+      VITE_API_URL: 'http://localhost:8080',
+      MODE: 'test'
+    }
+  }
+};
+
+// Mock Recharts components
+jest.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => 
+    React.createElement('div', { 'data-testid': 'responsive-container' }, children),
+  LineChart: ({ children }: { children: React.ReactNode }) => 
+    React.createElement('div', { 'data-testid': 'line-chart' }, children),
+  Line: () => React.createElement('div', { 'data-testid': 'line' }),
+  XAxis: () => React.createElement('div', { 'data-testid': 'x-axis' }),
+  YAxis: () => React.createElement('div', { 'data-testid': 'y-axis' }),
+  CartesianGrid: () => React.createElement('div', { 'data-testid': 'cartesian-grid' }),
+  Tooltip: () => React.createElement('div', { 'data-testid': 'tooltip' }),
+  Legend: () => React.createElement('div', { 'data-testid': 'legend' })
+}));
 
 configure({
   asyncUtilTimeout: 30000,

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { AuthCredentials, AuthResponse, AuthState } from '../../types/auth'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const API_URL = process.env.VITE_API_URL || 'http://localhost:8080'
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({

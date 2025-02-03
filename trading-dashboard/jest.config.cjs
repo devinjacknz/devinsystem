@@ -2,6 +2,11 @@
 const config = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  setupFiles: ['<rootDir>/src/test/env-setup.js'],
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons'],
+    url: 'http://localhost:3000'
+  },
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
@@ -13,9 +18,13 @@ const config = {
     }],
     '.+\\.(css|styl|less|sass|scss|png|jpg|ttf|woff|woff2)$': 'jest-transform-stub'
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(module-that-needs-to-be-transformed)/)'
+  ],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^virtual:env$': '<rootDir>/src/test/env-mock.js'
   },
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)'],
   verbose: true,

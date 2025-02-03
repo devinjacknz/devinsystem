@@ -59,6 +59,39 @@ export function PumpTrading({ tokens, onTrade }: PumpTradingProps) {
             </select>
           </div>
 
+          <div className="space-y-2">
+            <label htmlFor="amount" className="text-sm font-medium">
+              Amount
+            </label>
+            <input
+              id="amount"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full p-2 border rounded"
+              min="0"
+              step="0.000001"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => handleTrade('buy')}
+              disabled={isLoading || !amount || !selectedToken}
+              className="p-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+            >
+              {isLoading ? 'Processing...' : 'Buy'}
+            </button>
+            <button
+              onClick={() => handleTrade('sell')}
+              disabled={isLoading || !amount || !selectedToken}
+              className="p-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+            >
+              {isLoading ? 'Processing...' : 'Sell'}
+            </button>
+          </div>
+
           {selectedToken && (
             <>
               <div className="grid grid-cols-2 gap-4">

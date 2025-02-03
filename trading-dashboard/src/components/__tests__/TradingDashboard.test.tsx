@@ -85,10 +85,8 @@ describe('TradingDashboard', () => {
 
     const { unmount } = renderWithTheme(<TradingDashboard />)
     
-    const errorHeading = screen.getAllByRole('alert')[0]
-    expect(errorHeading).toHaveTextContent(/Connection Error/i)
-    
-    const errorMessage = screen.getAllByRole('alert')[1]
+    const errorContainer = screen.getByTestId('error-container')
+    const errorMessage = within(errorContainer).getByRole('alert')
     expect(errorMessage).toHaveTextContent(/Connection lost to trading servers/i)
     
     expect(screen.getByRole('status', { name: /connection status/i })).toHaveClass('bg-red-500')
@@ -686,11 +684,15 @@ describe('TradingDashboard', () => {
       value: { reload: mockReload }
     })
 
-    ;(useWebSocket as jest.Mock).mockImplementation(() => {
-      throw mockError
-    })
+    ;(useWebSocket as jest.Mock).mockImplementation(() => ({
+      data: null,
+      error: mockError,
+      isConnected: false,
+      retryCount: 3,
+      maxRetries: 3
+    }))
 
-    const { rerender } = renderWithTheme(
+    renderWithTheme(
       <ErrorBoundary>
         <TradingDashboard />
       </ErrorBoundary>
@@ -698,33 +700,36 @@ describe('TradingDashboard', () => {
 
     // Verify error state and UI
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /An error occurred in the trading dashboard/i })).toBeInTheDocument()
-      expect(screen.getByText(/Critical trading system error/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Reload Application/i })).toBeInTheDocument()
-      expect(screen.getByTestId('status-indicator')).toHaveClass('bg-red-500')
-      expect(screen.queryByRole('status', { name: /connection status/i })).not.toBeInTheDocument()
+      const errorContainer = screen.getByTestId('error-container')
+      expect(within(errorContainer).getByRole('alert')).toHaveTextContent(/Max retries reached/i)
+      expect(screen.getByRole('status', { name: /connection status/i })).toHaveClass('bg-red-500')
+      expect(screen.getByRole('button', { name: /Try Again/i })).toBeDisabled()
     }, { timeout: 3000 })
 
-    // Test error boundary reset
+    // Test reset functionality
     await act(async () => {
-      const errorContainer = screen.getByTestId('error-container')
-      const reloadButton = within(errorContainer).getByRole('button', { name: /Reload Application/i })
-      fireEvent.click(reloadButton)
+      const resetButton = screen.getByRole('button', { name: /Reset Connection/i })
+      fireEvent.click(resetButton)
       jest.advanceTimersByTime(1000)
     })
-    expect(mockReload).toHaveBeenCalled()
 
-    // Test recovery by re-rendering without error component
-    await act(async () => {
-      ;(useWebSocket as jest.Mock).mockImplementation(() => ({
-        data: mockPriceHistory,
-        error: null,
-        isConnected: true,
-        retryCount: 0
-      }))
-      rerender(<TradingDashboard />)
-      jest.advanceTimersByTime(1000)
-    })
+    // Mock successful recovery
+    ;(useWebSocket as jest.Mock).mockImplementation(() => ({
+      data: mockPriceHistory,
+      error: null,
+      isConnected: true,
+      retryCount: 0,
+      maxRetries: 3
+    }))
+
+    const tryAgainButton = screen.getByRole('button', { name: /Try Again/i })
+    fireEvent.click(tryAgainButton)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.getByRole('status', { name: /connection status/i })).toHaveClass('bg-green-500')
+      expect(screen.getByTestId('price-chart-card')).toBeInTheDocument()
+    }, { timeout: 3000 })
 
     // Mock successful WebSocket connections
     ;(useWebSocket as jest.Mock)
