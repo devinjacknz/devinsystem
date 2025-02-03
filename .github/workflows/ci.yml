@@ -1,0 +1,10 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  skip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip CI
+        run: echo "CI checks disabled"
+        shell: bash
