@@ -8,35 +8,28 @@ configure({
   testIdAttribute: 'data-testid'
 })
 
-interface MockWebSocketInstance extends WebSocket {
-  close: jest.Mock;
-  send: jest.Mock;
-  addEventListener: jest.Mock;
-  removeEventListener: jest.Mock;
-  binaryType: BinaryType;
-  dispatchEvent: (event: Event) => boolean;
-}
+class MockWebSocket implements WebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
 
-class MockWebSocket implements MockWebSocketInstance {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  static CLOSED = 3;
+  readonly CONNECTING = MockWebSocket.CONNECTING;
+  readonly OPEN = MockWebSocket.OPEN;
+  readonly CLOSING = MockWebSocket.CLOSING;
+  readonly CLOSED = MockWebSocket.CLOSED;
 
   url: string;
   readyState: number;
+  bufferedAmount = 0;
+  extensions = '';
+  protocol = '';
+  binaryType: BinaryType = 'blob';
+
   onopen: ((event: Event) => void) | null = null;
   onclose: ((event: CloseEvent) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
-  binaryType: BinaryType = 'blob';
-  bufferedAmount: number = 0;
-  extensions: string = '';
-  protocol: string = '';
-  
-  dispatchEvent(event: Event): boolean {
-    return true;
-  }
 
   constructor(url: string, protocols?: string | string[]) {
     this.url = url;
@@ -44,55 +37,60 @@ class MockWebSocket implements MockWebSocketInstance {
     if (protocols) {
       this.protocol = Array.isArray(protocols) ? protocols[0] : protocols;
     }
-    jest.advanceTimersByTime(0);
-    this.readyState = MockWebSocket.OPEN;
-    if (this.onopen) {
-      this.onopen(new Event('open'));
-    }
+    
+    queueMicrotask(() => {
+      if (this.readyState !== MockWebSocket.CLOSED) {
+        this.readyState = MockWebSocket.OPEN;
+        const event = new Event('open');
+        this.onopen?.(event);
+        this.dispatchEvent(event);
+      }
+    });
   }
 
-  close = jest.fn((code?: number, reason?: string) => {
+  close = jest.fn((code?: number, reason?: string): void => {
     if (this.readyState === MockWebSocket.CLOSED) return;
     this.readyState = MockWebSocket.CLOSING;
     queueMicrotask(() => {
       this.readyState = MockWebSocket.CLOSED;
-      this.onclose?.({ 
-        type: 'close',
-        target: this,
+      const closeEvent = new CloseEvent('close', {
+        wasClean: true,
         code: code || 1000,
-        reason: reason || '',
-        wasClean: true
+        reason: reason || ''
       });
+      this.onclose?.(closeEvent);
+      this.dispatchEvent(closeEvent);
     });
   });
 
-  send = jest.fn(() => {
+  send = jest.fn((data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
     if (this.readyState !== MockWebSocket.OPEN) {
       throw new Error('WebSocket is not open');
     }
   });
 
-  addEventListener = jest.fn((type: string, handler: (event: any) => void) => {
+  addEventListener = jest.fn((type: string, listener: EventListenerOrEventListenerObject, _options?: boolean | AddEventListenerOptions): void => {
+    const handler = typeof listener === 'function' ? listener : listener.handleEvent;
     switch (type) {
       case 'open':
-        this.onopen = handler;
+        this.onopen = handler as (event: Event) => void;
         if (this.readyState === MockWebSocket.OPEN) {
           queueMicrotask(() => handler({ type: 'open', target: this }));
         }
         break;
       case 'close':
-        this.onclose = handler;
+        this.onclose = handler as (event: CloseEvent) => void;
         break;
       case 'message':
-        this.onmessage = handler;
+        this.onmessage = handler as (event: MessageEvent) => void;
         break;
       case 'error':
-        this.onerror = handler;
+        this.onerror = handler as (event: Event) => void;
         break;
     }
   });
 
-  removeEventListener = jest.fn((type: string) => {
+  removeEventListener = jest.fn((type: string, _listener: EventListenerOrEventListenerObject, _options?: boolean | EventListenerOptions): void => {
     switch (type) {
       case 'open':
         this.onopen = null;
@@ -107,6 +105,24 @@ class MockWebSocket implements MockWebSocketInstance {
         this.onerror = null;
         break;
     }
+  });
+
+  dispatchEvent = jest.fn((event: Event): boolean => {
+    switch (event.type) {
+      case 'open':
+        this.onopen?.(event);
+        break;
+      case 'close':
+        this.onclose?.(event as CloseEvent);
+        break;
+      case 'message':
+        this.onmessage?.(event as MessageEvent);
+        break;
+      case 'error':
+        this.onerror?.(event);
+        break;
+    }
+    return true;
   });
 }
 
