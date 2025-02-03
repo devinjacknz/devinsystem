@@ -1,10 +1,10 @@
 import { ThemeProvider } from './components/theme-provider'
 import { TradingDashboard } from './components/TradingDashboard'
-import { ErrorBoundary } from './components/ErrorBoundary.js'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
-const App = () => {
+export default function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider>
       <div className="min-h-screen bg-background">
         <header className="border-b">
           <div className="container mx-auto p-4">
@@ -20,5 +20,3 @@ const App = () => {
     </ThemeProvider>
   )
 }
-
-export default App
