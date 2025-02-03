@@ -1,12 +1,17 @@
+export enum WalletType {
+  Trading = 'trading',
+  Profit = 'profit'
+}
+
 export interface WalletInfo {
   address: string;
   balance: number;
-  type: 'trading' | 'profit';
+  type: WalletType;
 }
 
 export interface WalletTransfer {
-  fromType: WalletInfo['type'];
-  toType: WalletInfo['type'];
+  fromType: WalletType;
+  toType: WalletType;
   amount: number;
 }
 

@@ -1,61 +1,60 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface WebSocketOptions {
   onOpen?: () => void
   onMessage?: (data: any) => void
   onClose?: () => void
-  onError?: (error: Event) => void
+  onError?: (error: any) => void
 }
 
-export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
+export function useWebSocket(url: string, options: WebSocketOptions = {}) {
   const ws = useRef<WebSocket | null>(null)
-  const reconnectTimeout = useRef<NodeJS.Timeout>()
-
-  const connect = useCallback(() => {
-    ws.current = new WebSocket(url)
-
-    ws.current.addEventListener('open', () => {
-      options.onOpen?.()
-    })
-
-    ws.current.addEventListener('message', (event) => {
-      try {
-        const data = event.data instanceof Blob ? event.data : JSON.parse(event.data)
-        options.onMessage?.(data)
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error)
-      }
-    })
-
-    ws.current.addEventListener('close', () => {
-      options.onClose?.()
-      reconnectTimeout.current = setTimeout(connect, 5000)
-    })
-
-    ws.current.addEventListener('error', (error) => {
-      options.onError?.(error)
-    })
-  }, [url, options])
+  const [readyState, setReadyState] = useState<number>(WebSocket.CONNECTING)
 
   useEffect(() => {
-    connect()
+    ws.current = new WebSocket(url)
+
+    ws.current.onopen = () => {
+      setReadyState(WebSocket.OPEN)
+      options.onOpen?.()
+    }
+
+    ws.current.onmessage = (event) => {
+      let data = event.data
+      try {
+        if (typeof data === 'string') {
+          data = JSON.parse(data)
+        }
+      } catch (e) {
+        // Keep raw data if parsing fails
+      }
+      options.onMessage?.(data)
+    }
+
+    ws.current.onclose = () => {
+      setReadyState(WebSocket.CLOSED)
+      options.onClose?.()
+    }
+
+    ws.current.onerror = (error) => {
+      options.onError?.(error)
+    }
+
     return () => {
-      ws.current?.close()
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current)
+      if (ws.current) {
+        ws.current.close()
       }
     }
-  }, [connect])
+  }, [url])
 
-  const send = useCallback((message: any) => {
+  const send = (data: any) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(message))
+      ws.current.send(JSON.stringify(data))
     }
-  }, [])
+  }
 
   return {
     send,
-    readyState: ws.current?.readyState,
-    lastMessage: null
+    readyState
   }
 }
