@@ -1,45 +1,13 @@
-import React, { useState, useCallback, useEffect, memo, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useWebSocket } from '../hooks/use-websocket'
-import type { PriceData, Position, TimeRange, TradingPair, ActiveSymbol } from '../types'
-import { TRADING_PAIRS, TIME_RANGES } from '../types'
+import React, { useState } from 'react'
 import { ErrorBoundary } from './ErrorBoundary'
-import { clsx } from 'clsx'
+import { ModeSelection } from './ModeSelection'
+import { AgentDashboard } from './agent/AgentDashboard'
+import { useAuth } from '../hooks/auth/useAuth'
+import { TradingMode } from '../types/agent'
 
-interface TradingDashboardProps {
-  initialSymbol?: ActiveSymbol;
-  initialTimeRange?: TimeRange;
-  onSymbolChange?: (symbol: TradingPair) => void;
-  onTimeRangeChange?: (range: TimeRange) => void;
-  onError?: (error: Error) => void;
-  onConnectionStateChange?: (isConnected: boolean) => void;
-}
-
-const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
-
-const formatTimestamp = (timestamp: number) => 
-  new Date(timestamp).toLocaleString()
-
-export const TradingDashboard: React.FC<TradingDashboardProps> = memo(({ 
-  initialSymbol = TRADING_PAIRS[0],
-  initialTimeRange = '24H',
-  onSymbolChange,
-  onTimeRangeChange,
-  onError,
-  onConnectionStateChange
-}) => {
-  const [activeSymbol, setActiveSymbol] = useState<ActiveSymbol>(initialSymbol)
-  const [timeRange, setTimeRange] = useState<TimeRange>(initialTimeRange)
-  const [isChartLoading, setIsChartLoading] = useState(false)
-  const [isPositionsLoading, setIsPositionsLoading] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const [hasReachedMaxRetries, setHasReachedMaxRetries] = useState(false)
-  const [retryTimeout, setRetryTimeout] = useState(0)
-  const MAX_RETRIES = 3
-  const RETRY_TIMEOUT = 30
+export function TradingDashboard() {
+  const [mode, setMode] = useState<TradingMode>(TradingMode.DEX)
+  const { isAuthenticated, isLoading } = useAuth()
   
   const { data: priceHistory, error: priceError, isConnected: isPriceConnected, disconnect: disconnectPrice } = 
     useWebSocket<PriceData[]>(`ws://localhost:8080/ws/prices?timeRange=${timeRange}&symbol=${encodeURIComponent(activeSymbol)}&retry=${retryCount}`)
@@ -528,27 +496,44 @@ export const TradingDashboard: React.FC<TradingDashboardProps> = memo(({
 
   const { totalPnL = 0, totalValue = 0, percentageChange = 0 } = stats || {}
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
+          <p className="text-muted-foreground">Please log in to access the trading dashboard.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
-      <div className="space-y-6">
-        {renderError()}
-        {renderLoading()}
-        {renderContent()}
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground" role="heading" aria-level={3}>Portfolio Value</h3>
-                <p className="text-2xl font-bold" role="status" aria-label="Portfolio value">{formatCurrency(totalValue)}</p>
-                <p className={clsx(
-                  "text-sm",
-                  percentageChange >= 0 ? "text-green-500" : "text-red-500"
-                )} role="status" aria-label="Portfolio change">
-                  {percentageChange >= 0 ? "↑" : "↓"} {Math.abs(percentageChange).toFixed(2)}%
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="container mx-auto py-6 space-y-8">
+        <header className="text-center mb-8">
+          <h1 className="text-3xl font-bold">Trading Dashboard</h1>
+          <p className="text-muted-foreground mt-2">Select your trading mode and manage your agents</p>
+        </header>
+
+        <ModeSelection
+          selectedMode={mode}
+          onModeSelect={setMode}
+        />
+
+        <AgentDashboard mode={mode} />
+      </div>
+    </ErrorBoundary>
+  );
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col space-y-2">
