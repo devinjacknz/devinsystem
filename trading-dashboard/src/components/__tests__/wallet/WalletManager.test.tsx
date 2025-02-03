@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { WalletManager } from '../../wallet/WalletManager'
 import { useWallet } from '../../../hooks/wallet/useWallet'
+import { WalletType } from '../../../types/wallet'
 
 jest.mock('../../../hooks/wallet/useWallet')
 
@@ -9,14 +10,17 @@ describe('WalletManager', () => {
     tradingWallet: {
       address: 'trading-wallet-address',
       balance: 1000,
-      type: 'trading'
+      type: WalletType.Trading
     },
     profitWallet: {
       address: 'profit-wallet-address',
       balance: 500,
-      type: 'profit'
+      type: WalletType.Profit
     },
-    onTransfer: jest.fn()
+    onTransfer: jest.fn(),
+    onConnect: jest.fn(),
+    isConnecting: false,
+    error: null
   }
 
   const mockWallet = {
@@ -56,19 +60,19 @@ describe('WalletManager', () => {
     const amountInput = screen.getByLabelText(/amount/i)
     const transferButton = screen.getByRole('button', { name: /transfer/i })
 
-    fireEvent.change(fromSelect, { target: { value: 'trading' } })
-    fireEvent.change(toSelect, { target: { value: 'profit' } })
+    fireEvent.change(fromSelect, { target: { value: WalletType.Trading } })
+    fireEvent.change(toSelect, { target: { value: WalletType.Profit } })
     fireEvent.change(amountInput, { target: { value: '100' } })
     fireEvent.click(transferButton)
 
     expect(screen.getByRole('button', { name: /transferring/i })).toBeDisabled()
 
     await waitFor(() => {
-      expect(mockTransfer).toHaveBeenCalledWith({
-        fromType: 'trading',
-        toType: 'profit',
-        amount: 100
-      })
+      expect(mockTransfer).toHaveBeenCalledWith(
+        WalletType.Trading,
+        WalletType.Profit,
+        100
+      )
       expect(screen.getByText(/transaction successful/i)).toBeInTheDocument()
       expect(screen.getByText(/tx-hash/i)).toBeInTheDocument()
     })
@@ -80,7 +84,7 @@ describe('WalletManager', () => {
     const fromSelect = screen.getByLabelText(/from wallet/i)
     const amountInput = screen.getByLabelText(/amount/i)
 
-    fireEvent.change(fromSelect, { target: { value: 'trading' } })
+    fireEvent.change(fromSelect, { target: { value: WalletType.Trading } })
     fireEvent.change(amountInput, { target: { value: '2000' } })
 
     expect(screen.getByText(/insufficient balance/i)).toBeInTheDocument()
@@ -101,8 +105,8 @@ describe('WalletManager', () => {
     const amountInput = screen.getByLabelText(/amount/i)
     const transferButton = screen.getByRole('button', { name: /transfer/i })
 
-    fireEvent.change(fromSelect, { target: { value: 'trading' } })
-    fireEvent.change(toSelect, { target: { value: 'profit' } })
+    fireEvent.change(fromSelect, { target: { value: WalletType.Trading } })
+    fireEvent.change(toSelect, { target: { value: WalletType.Profit } })
     fireEvent.change(amountInput, { target: { value: '100' } })
     fireEvent.click(transferButton)
 
@@ -129,8 +133,8 @@ describe('WalletManager', () => {
     const fromSelect = screen.getByLabelText(/from wallet/i)
     const toSelect = screen.getByLabelText(/to wallet/i)
     
-    fireEvent.change(fromSelect, { target: { value: 'trading' } })
-    fireEvent.change(toSelect, { target: { value: 'trading' } })
+    fireEvent.change(fromSelect, { target: { value: WalletType.Trading } })
+    fireEvent.change(toSelect, { target: { value: WalletType.Trading } })
 
     expect(screen.getByText(/cannot transfer to same wallet/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /transfer/i })).toBeDisabled()

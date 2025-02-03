@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
-import { WalletInfo, WalletState, WalletTransfer } from '../../types/wallet'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+import { WalletInfo, WalletType, WalletState } from '../../types/wallet'
+import { API_URL } from '../../utils/env'
 
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
@@ -11,38 +10,11 @@ export function useWallet() {
     error: null
   })
 
-  const connectWallets = useCallback(async () => {
-    setState(prev => ({ ...prev, isConnecting: true, error: null }))
-    try {
-      const response = await fetch(`${API_URL}/wallet/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to connect wallets')
-      }
-
-      const data: { tradingWallet: WalletInfo; profitWallet: WalletInfo } = await response.json()
-      setState({
-        tradingWallet: data.tradingWallet,
-        profitWallet: data.profitWallet,
-        isConnecting: false,
-        error: null
-      })
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to connect wallets',
-        isConnecting: false
-      }))
-    }
-  }, [])
-
-  const transfer = useCallback(async (transfer: WalletTransfer) => {
+  const transfer = useCallback(async (
+    fromType: WalletType,
+    toType: WalletType,
+    amount: number
+  ) => {
     try {
       const response = await fetch(`${API_URL}/wallet/transfer`, {
         method: 'POST',
@@ -50,31 +22,22 @@ export function useWallet() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
-        body: JSON.stringify(transfer)
+        body: JSON.stringify({ fromType, toType, amount })
       })
 
+      const data = await response.json()
       if (!response.ok) {
-        throw new Error('Transfer failed')
+        throw new Error(data.error || 'Transfer failed')
       }
 
-      const data: { tradingWallet: WalletInfo; profitWallet: WalletInfo } = await response.json()
-      setState(prev => ({
-        ...prev,
-        tradingWallet: data.tradingWallet,
-        profitWallet: data.profitWallet,
-        error: null
-      }))
+      return data
     } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Transfer failed'
-      }))
+      throw error instanceof Error ? error : new Error('Transfer failed')
     }
   }, [])
 
   return {
     ...state,
-    connectWallets,
     transfer
   }
 }
