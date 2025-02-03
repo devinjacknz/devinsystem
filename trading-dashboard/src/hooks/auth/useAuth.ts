@@ -1,16 +1,16 @@
 import { useState, useCallback } from 'react'
-import { AuthCredentials, AuthResponse, AuthState } from '../../types/auth'
+import { AuthCredentials, AuthState } from '../../types/auth'
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8080'
 
 export function useAuth() {
-  const [state, setState] = useState<AuthState>({
-    isAuthenticated: false,
+  const [state, setState] = useState<AuthState>(() => ({
+    isAuthenticated: !!localStorage.getItem('auth_token'),
     user: null,
-    token: null,
+    token: localStorage.getItem('auth_token'),
     error: null,
     isLoading: false
-  })
+  }))
 
   const login = useCallback(async (credentials: AuthCredentials) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -21,19 +21,21 @@ export function useAuth() {
         body: JSON.stringify(credentials)
       })
       
+      const data = await response.json()
       if (!response.ok) {
-        throw new Error('Login failed')
+        throw new Error(data.error || 'Invalid credentials')
       }
 
-      const data: AuthResponse = await response.json()
-      setState({
+      const token = data.token
+      localStorage.setItem('auth_token', token)
+      setState(prev => ({
+        ...prev,
         isAuthenticated: true,
         user: data.user,
-        token: data.token,
+        token: token,
         error: null,
         isLoading: false
-      })
-      localStorage.setItem('auth_token', data.token)
+      }))
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -52,19 +54,21 @@ export function useAuth() {
         body: JSON.stringify(credentials)
       })
       
+      const data = await response.json()
       if (!response.ok) {
-        throw new Error('Registration failed')
+        throw new Error(data.error || 'Registration failed')
       }
 
-      const data: AuthResponse = await response.json()
-      setState({
+      const token = data.token
+      localStorage.setItem('auth_token', token)
+      setState(prev => ({
+        ...prev,
         isAuthenticated: true,
         user: data.user,
-        token: data.token,
+        token: token,
         error: null,
         isLoading: false
-      })
-      localStorage.setItem('auth_token', data.token)
+      }))
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -76,13 +80,14 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     localStorage.removeItem('auth_token')
-    setState({
+    setState(prev => ({
+      ...prev,
       isAuthenticated: false,
       user: null,
       token: null,
       error: null,
       isLoading: false
-    })
+    }))
   }, [])
 
   return {
