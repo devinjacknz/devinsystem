@@ -53,7 +53,7 @@ const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content> & { 'aria-label'?: string }
 >(({ className, forceMount = true, 'aria-label': ariaLabel, value, ...props }, ref) => {
-  const isInactive = props['data-state'] === 'inactive';
+  const isInactive = (props as any)['data-state'] === 'inactive';
   const { hidden: _, ...otherProps } = props;
   return (
     <TabsPrimitive.Content

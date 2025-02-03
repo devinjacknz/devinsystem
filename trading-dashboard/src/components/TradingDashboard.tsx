@@ -179,7 +179,7 @@ export const TradingDashboard: React.FC<TradingDashboardProps> = memo(({
 
   const hasError = priceError || positionsError
   const error = priceError || positionsError
-  const isConnectionError = !isPriceConnected && !isPositionsConnected
+  const _isConnectionError = !isPriceConnected && !isPositionsConnected // Unused for now
   const isPartialConnection = (isPriceConnected && !isPositionsConnected) || (!isPriceConnected && isPositionsConnected)
 
   const statusColor = useMemo(() => {

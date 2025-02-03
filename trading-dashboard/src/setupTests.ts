@@ -14,6 +14,7 @@ interface MockWebSocketInstance extends WebSocket {
   addEventListener: jest.Mock;
   removeEventListener: jest.Mock;
   binaryType: BinaryType;
+  dispatchEvent: (event: Event) => boolean;
 }
 
 class MockWebSocket implements MockWebSocketInstance {
@@ -32,6 +33,10 @@ class MockWebSocket implements MockWebSocketInstance {
   bufferedAmount: number = 0;
   extensions: string = '';
   protocol: string = '';
+  
+  dispatchEvent(event: Event): boolean {
+    return true;
+  }
 
   constructor(url: string, protocols?: string | string[]) {
     this.url = url;

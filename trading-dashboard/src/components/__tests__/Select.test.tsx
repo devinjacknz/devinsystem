@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import '@testing-library/jest-dom'
-import React from 'react'
+// React is used implicitly by JSX
 
 describe('Select Components', () => {
   const options = [
