@@ -44,16 +44,24 @@ func NewTradingEngine(riskMgr risk.Manager, walletMgr wallet.Manager) *tradingEn
 }
 
 func (e *tradingEngine) PlaceOrder(order Order) error {
-	if err := e.riskMgr.ValidateOrder(order); err != nil {
+	riskOrder := risk.Order{
+		Symbol:    order.Symbol,
+		Side:      order.Side,
+		Amount:    order.Amount,
+		Price:     order.Price,
+		OrderType: order.OrderType,
+	}
+	if err := e.riskMgr.ValidateOrder(riskOrder); err != nil {
 		return fmt.Errorf("risk validation failed: %w", err)
 	}
 
-	exchange, err := e.exchangeMgr.GetExchange(order.Exchange)
+	exchangeImpl, err := e.exchangeMgr.GetExchange(order.Exchange)
 	if err != nil {
 		return fmt.Errorf("failed to get exchange: %w", err)
 	}
 
-	if err := exchange.ExecuteOrder(exchange.Order{
+	// Convert trading.Order to exchange.Order
+	if err := exchangeImpl.ExecuteOrder(exchange.Order{
 		Symbol:    order.Symbol,
 		Side:      order.Side,
 		Amount:    order.Amount,

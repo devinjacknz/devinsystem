@@ -25,4 +25,5 @@ type WalletManager struct {
 type Wallet interface {
 	GetBalance() float64
 	Transfer(to Wallet, amount float64) error
+	ReceiveFunds(amount float64) error
 }

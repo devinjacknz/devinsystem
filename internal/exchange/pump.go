@@ -35,7 +35,7 @@ func (p *PumpFun) GetMarketPrice(symbol string) (float64, error) {
 
 func (p *PumpFun) ExecuteOrder(order Order) error {
 	p.mu.RLock()
-	market, exists := p.markets[order.Symbol]
+	_, exists := p.markets[order.Symbol]
 	p.mu.RUnlock()
 
 	if !exists {

@@ -30,10 +30,20 @@ type RiskManager struct {
 	maxExposure float64
 }
 
+func NewManager() Manager {
+	return &RiskManager{
+		stopLoss:    NewStopLoss(),
+		slippage:    NewSlippageProtection(50),
+		aiService:   &ai.MockService{},
+		exposures:   make(map[string]float64),
+		maxExposure: 1000000, // 1M default max exposure
+	}
+}
+
 func NewRiskManager(aiService ai.Service, maxExposure float64) *RiskManager {
 	return &RiskManager{
 		stopLoss:    NewStopLoss(),
-		slippage:    NewSlippageProtection(50), // 0.5% default max slippage
+		slippage:    NewSlippageProtection(50),
 		aiService:   aiService,
 		exposures:   make(map[string]float64),
 		maxExposure: maxExposure,

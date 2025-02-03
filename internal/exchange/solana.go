@@ -87,7 +87,7 @@ func (dex *SolanaDEX) GetMarketPrice(symbol string) (float64, error) {
 
 func (dex *SolanaDEX) ExecuteOrder(order Order) error {
 	dex.mu.RLock()
-	market, exists := dex.markets[order.Symbol]
+	_, exists := dex.markets[order.Symbol]
 	dex.mu.RUnlock()
 
 	if !exists {
