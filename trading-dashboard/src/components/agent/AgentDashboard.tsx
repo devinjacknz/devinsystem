@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAgent } from '../../hooks/agent/useAgent';
-import { Agent, TradingMode } from '../../types/agent';
+import { Agent, TradingMode, AgentStrategy } from '../../types/agent';
 import { cn } from '../../lib/utils';
+import { StrategyEditor } from './StrategyEditor';
 
 interface AgentDashboardProps {
   mode: TradingMode;
@@ -10,20 +11,44 @@ interface AgentDashboardProps {
 export function AgentDashboard({ mode }: AgentDashboardProps) {
   const { agents, isLoading, error, createAgent, updateAgent, toggleAgent } = useAgent();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [editingStrategy, setEditingStrategy] = useState<{ agentId: string; strategy: Omit<AgentStrategy, 'id'> } | null>(null);
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Trading Agents</h2>
-        <div className="space-x-4">
+    <div className={cn("w-full max-w-4xl mx-auto p-4 space-y-6")}>
+      <div className={cn("flex justify-between items-center")}>
+        <h2 className={cn("text-2xl font-bold text-primary")}>Trading Agents</h2>
+        <div className={cn("space-x-4")}>
           <button
-            onClick={() => createAgent({ name: 'New Agent', mode })}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            onClick={() => createAgent({
+              name: 'New Agent',
+              mode,
+              strategy: {
+                name: 'Default Strategy',
+                mode,
+                parameters: {
+                  entryConditions: [],
+                  exitConditions: [],
+                  riskManagement: {
+                    stopLoss: 5,
+                    takeProfit: 10,
+                    maxPositionSize: 100
+                  }
+                }
+              }
+            })}
+            className={cn("px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90")}
           >
             Create Agent
           </button>
           <button
-            onClick={() => selectedAgent && updateAgent({ id: selectedAgent.id })}
+            onClick={() => selectedAgent && setEditingStrategy({
+              agentId: selectedAgent.id,
+              strategy: {
+                name: selectedAgent.strategy.name,
+                mode: selectedAgent.strategy.mode,
+                parameters: selectedAgent.strategy.parameters
+              }
+            })}
             disabled={!selectedAgent}
             className={cn(
               "px-4 py-2 rounded-md",
@@ -50,20 +75,38 @@ export function AgentDashboard({ mode }: AgentDashboardProps) {
       </div>
 
       {error && (
-        <div className="p-4 bg-destructive/10 text-destructive rounded-md">
+        <div className={cn("p-4 bg-destructive/10 text-destructive rounded-md")}>
           {error}
         </div>
       )}
 
-      <div className="space-y-4">
+      {editingStrategy && (
+        <div className={cn("fixed inset-0 bg-black/50 flex items-center justify-center z-50")}>
+          <div className={cn("bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 overflow-auto max-h-[90vh]")}>
+            <StrategyEditor
+              strategy={editingStrategy.strategy}
+              onSave={(updatedStrategy) => {
+                updateAgent({
+                  id: editingStrategy.agentId,
+                  strategy: updatedStrategy
+                });
+                setEditingStrategy(null);
+              }}
+              onCancel={() => setEditingStrategy(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className={cn("space-y-4")}>
         {isLoading ? (
-          <div className="text-center p-4">Loading agents...</div>
+          <div className={cn("text-center p-4 text-muted-foreground")}>Loading agents...</div>
         ) : agents.length === 0 ? (
-          <div className="text-center p-4 text-muted-foreground">
+          <div className={cn("text-center p-4 text-muted-foreground")}>
             No agents created. Click "Create Agent" to get started.
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className={cn("grid gap-4")}>
             {agents
               .filter(agent => agent.mode === mode)
               .map(agent => (
@@ -77,14 +120,14 @@ export function AgentDashboard({ mode }: AgentDashboardProps) {
                       : "border-border hover:border-primary/50"
                   )}
                 >
-                  <div className="flex justify-between items-center">
+                  <div className={cn("flex justify-between items-center")}>
                     <div>
-                      <h3 className="font-semibold">{agent.name}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <h3 className={cn("font-semibold")}>{agent.name}</h3>
+                      <p className={cn("text-sm text-muted-foreground")}>
                         Last executed: {agent.status.lastExecuted}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className={cn("flex items-center space-x-4")}>
                       <span className={cn(
                         "px-2 py-1 rounded-full text-xs",
                         agent.status.status === 'active'
@@ -95,7 +138,7 @@ export function AgentDashboard({ mode }: AgentDashboardProps) {
                       )}>
                         {agent.status.status}
                       </span>
-                      <div className="text-right text-sm">
+                      <div className={cn("text-right text-sm")}>
                         <div>Total Trades: {agent.status.performance.totalTrades}</div>
                         <div>Success Rate: {agent.status.performance.successRate}%</div>
                         <div>PnL: {agent.status.performance.pnl}</div>
