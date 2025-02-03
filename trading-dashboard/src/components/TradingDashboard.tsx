@@ -1,12 +1,19 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ErrorBoundary } from './ErrorBoundary'
-import { ModeSelection } from './ModeSelection'
 import { AgentDashboard } from './agent/AgentDashboard'
 import { useAuth } from '../hooks/auth/useAuth'
 import { TradingMode } from '../types/agent'
 
-export const TradingDashboard: React.FC = () => {
-  const [mode, setMode] = useState<TradingMode>(TradingMode.DEX)
+interface TradingDashboardProps {
+  initialMode: TradingMode;
+}
+
+export const TradingDashboard: React.FC<TradingDashboardProps> = ({ initialMode }) => {
+  const [mode, setMode] = useState<TradingMode>(initialMode)
+  
+  useEffect(() => {
+    setMode(initialMode)
+  }, [initialMode])
   const { isAuthenticated, isLoading: authLoading } = useAuth()
 
   if (authLoading) {
@@ -37,11 +44,6 @@ export const TradingDashboard: React.FC = () => {
           <h1 className="text-3xl font-bold">Trading Dashboard</h1>
           <p className="text-muted-foreground mt-2">Select your trading mode and manage your agents</p>
         </header>
-
-        <ModeSelection
-          selectedMode={mode}
-          onModeSelect={setMode}
-        />
 
         <AgentDashboard mode={mode} />
       </div>

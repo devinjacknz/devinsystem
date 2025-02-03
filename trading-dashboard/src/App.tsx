@@ -1,19 +1,22 @@
 import { ThemeProvider } from './components/theme-provider'
 import { TradingDashboard } from './components/TradingDashboard'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { Navbar } from './components/layout/Navbar'
+import { TradingMode } from './types/agent'
+import { useState } from 'react'
+import { cn } from './lib/utils'
+
+const DEFAULT_MODE = TradingMode.DEX
 
 export default function App() {
+  const [mode, setMode] = useState<TradingMode>(DEFAULT_MODE)
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold">Solana Trading System</h1>
-          </div>
-        </header>
-        <main className="container mx-auto py-6">
+      <div className={cn("min-h-screen bg-background")}>
+        <Navbar currentMode={mode} onModeChange={setMode} />
+        <main className={cn("container mx-auto py-6")}>
           <ErrorBoundary>
-            <TradingDashboard />
+            <TradingDashboard initialMode={mode} />
           </ErrorBoundary>
         </main>
       </div>
