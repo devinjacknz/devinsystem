@@ -123,7 +123,7 @@ class AIIntegrationService:
     def _extract_price(self, text: str, key: str) -> float:
         try:
             import re
-            pattern = f"{key}.*?(\d+\.?\d*)"
+            pattern = f"{key}.*?([0-9]+\.?[0-9]*)"
             match = re.search(pattern, text.lower())
             return float(match.group(1)) if match else 0.0
         except:
@@ -132,7 +132,7 @@ class AIIntegrationService:
     def _extract_number(self, text: str, key: str) -> float:
         try:
             import re
-            pattern = f"{key}.*?(\d+\.?\d*)"
+            pattern = f"{key}.*?([0-9]+\.?[0-9]*)"
             match = re.search(pattern, text.lower())
             return float(match.group(1)) if match else 0.0
         except:
@@ -141,7 +141,7 @@ class AIIntegrationService:
     def _extract_percentage(self, text: str, key: str) -> float:
         try:
             import re
-            pattern = f"{key}.*?(\d+\.?\d*)%?"
+            pattern = f"{key}.*?([0-9]+\.?[0-9]*)%?"
             match = re.search(pattern, text.lower())
             return float(match.group(1)) if match else 0.0
         except:
@@ -150,7 +150,7 @@ class AIIntegrationService:
     def _extract_score(self, text: str, key: str) -> float:
         try:
             import re
-            pattern = f"{key}.*?(\d+\.?\d*)/10"
+            pattern = f"{key}.*?([0-9]+\.?[0-9]*)/10"
             match = re.search(pattern, text.lower())
             return float(match.group(1)) if match else 5.0
         except:
@@ -159,7 +159,7 @@ class AIIntegrationService:
     def _extract_signal(self, text: str, key: str) -> str:
         try:
             import re
-            pattern = f"{key}.*?:\s*(.*?)(?:\n|$)"
+            pattern = f"{key}.*?:[ \t]*(.*?)(?:\n|$)"
             match = re.search(pattern, text.lower())
             return match.group(1).strip().capitalize() if match else "Neutral"
         except:
