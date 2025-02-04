@@ -19,6 +19,8 @@ class AgentStrategy(BaseModel):
     take_profit_percentage: float = Field(gt=0.0, le=1000.0)
     auto_rebalance: bool = False
     rebalance_threshold: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    wallet_address: str = Field(..., description="Solana wallet address for trading")
+    network: str = Field(default="mainnet", pattern="^(mainnet|devnet|testnet)$")
 
 class Agent(BaseModel):
     id: str
