@@ -15,5 +15,6 @@ type RiskAnalysis struct {
 }
 
 type Service interface {
-	AnalyzeRisk(data MarketData) (RiskAnalysis, error)
+	AnalyzeMarket(data MarketData) (*Analysis, error)
+	AnalyzeRisk(data MarketData) (*RiskAnalysis, error)
 }
