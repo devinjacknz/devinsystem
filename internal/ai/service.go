@@ -4,13 +4,6 @@ import (
 	"sync"
 )
 
-type MarketData struct {
-	Symbol string
-	Price  float64
-	Volume float64
-	Trend  string
-}
-
 type Analysis struct {
 	Symbol     string
 	Trend      string
@@ -23,18 +16,6 @@ type Signal struct {
 	Symbol     string
 	Action     string
 	Confidence float64
-}
-
-type RiskAnalysis struct {
-	Symbol        string
-	RiskLevel     string
-	StopLossPrice float64
-	Confidence    float64
-}
-
-type Service interface {
-	AnalyzeMarket(data MarketData) (*Analysis, error)
-	AnalyzeRisk(data MarketData) (*RiskAnalysis, error)
 }
 
 type AIService struct {
