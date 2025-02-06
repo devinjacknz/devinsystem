@@ -8,23 +8,25 @@ import (
 )
 
 type DeepSeekClient struct {
-	endpoint string
-	apiKey   string
+	endpoint    string
+	model       string
+	temperature float64
 }
 
 type DeepSeekRequest struct {
-	Input     string            `json:"input"`
-	Parameters map[string]string `json:"parameters"`
+	Input      string         `json:"input"`
+	Parameters map[string]any `json:"parameters"`
 }
 
 type DeepSeekResponse struct {
 	Output string `json:"output"`
 }
 
-func NewDeepSeekClient(endpoint, apiKey string) *DeepSeekClient {
+func NewDeepSeekClient(endpoint, model string, temperature float64) *DeepSeekClient {
 	return &DeepSeekClient{
-		endpoint: endpoint,
-		apiKey:   apiKey,
+		endpoint:    endpoint,
+		model:       model,
+		temperature: temperature,
 	}
 }
 
@@ -34,8 +36,10 @@ func (c *DeepSeekClient) AnalyzeRisk(data MarketData) (*RiskAnalysis, error) {
 			"Analyze risk for %s with current price %.2f and volume %.2f",
 			data.Symbol, data.Price, data.Volume,
 		),
-		Parameters: map[string]string{
+		Parameters: map[string]any{
 			"mode": "risk_analysis",
+			"model": c.model,
+			"temperature": c.temperature,
 		},
 	}
 
