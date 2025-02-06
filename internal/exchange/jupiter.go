@@ -33,43 +33,65 @@ func (j *JupiterDEX) Name() string {
 }
 
 func (j *JupiterDEX) GetMarketData() (*MarketData, error) {
-	url := fmt.Sprintf("%s%s", JupiterBaseURL, PriceEndpoint)
+	// Get market data for SOL/USDC as default pair
+	const (
+		solMint = "So11111111111111111111111111111111111111112"
+		usdcMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+	)
+	
+	url := fmt.Sprintf("%s%s?inputMint=%s&outputMint=%s", JupiterBaseURL, PriceEndpoint, solMint, usdcMint)
 	resp, err := j.client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get market data: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	var priceData struct {
-		Price  float64 `json:"price"`
-		Volume float64 `json:"volume"`
+		Data struct {
+			Price  float64 `json:"price"`
+			Volume float64 `json:"volume24h"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&priceData); err != nil {
 		return nil, fmt.Errorf("failed to decode market data: %w", err)
 	}
 
 	return &MarketData{
-		Price:  priceData.Price,
-		Volume: priceData.Volume,
+		Symbol: "SOL/USDC",
+		Price:  priceData.Data.Price,
+		Volume: priceData.Data.Volume,
 	}, nil
 }
 
 func (j *JupiterDEX) GetMarketPrice(symbol string) (float64, error) {
-	url := fmt.Sprintf("%s%s/%s", JupiterBaseURL, PriceEndpoint, symbol)
+	// Convert symbol to mint addresses (e.g., "SOL/USDC" -> solMint/usdcMint)
+	inputMint, outputMint := "So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+	
+	url := fmt.Sprintf("%s%s?inputMint=%s&outputMint=%s", JupiterBaseURL, PriceEndpoint, inputMint, outputMint)
 	resp, err := j.client.Get(url)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get price: %w", err)
+		return 0, fmt.Errorf("failed to get price for %s: %w", symbol, err)
 	}
 	defer resp.Body.Close()
 
-	var priceData struct {
-		Price float64 `json:"price"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&priceData); err != nil {
-		return 0, fmt.Errorf("failed to decode price: %w", err)
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, symbol)
 	}
 
-	return priceData.Price, nil
+	var priceData struct {
+		Data struct {
+			Price float64 `json:"price"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&priceData); err != nil {
+		return 0, fmt.Errorf("failed to decode price data for %s: %w", symbol, err)
+	}
+
+	return priceData.Data.Price, nil
 }
 
 func (j *JupiterDEX) ExecuteOrder(order Order) error {
