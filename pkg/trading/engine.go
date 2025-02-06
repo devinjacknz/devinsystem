@@ -17,17 +17,19 @@ type Engine struct {
 	ollama      models.Client
 	riskMgr     *RiskManager
 	tokenCache  *utils.TokenCache
+	mongoRepo   *mongo.Repository
 	isRunning   bool
 	stopChan    chan struct{}
 	positions   map[string]float64
 }
 
-func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache) *Engine {
+func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache, mongoRepo *mongo.Repository) *Engine {
 	return &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
 		tokenCache: tokenCache,
+		mongoRepo:  mongoRepo,
 		stopChan:  make(chan struct{}),
 		positions: make(map[string]float64),
 	}
@@ -125,7 +127,7 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 			continue
 		}
 
-		decision, err := e.ollama.GenerateTradeDecision(ctx, data)
+		decision, err := e.ollama.GenerateTradeDecision(ctx, data, e.mongoRepo)
 		if err != nil {
 			continue
 		}
