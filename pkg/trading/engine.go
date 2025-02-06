@@ -2,29 +2,34 @@ package trading
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
+	"github.com/devinjacknz/devinsystem/pkg/utils"
 )
 
 type Engine struct {
 	mu          sync.RWMutex
 	marketData  market.Client
-	ollama      models.OllamaClient
+	ollama      models.Client
 	riskMgr     *RiskManager
-	tokenCache  *TokenCache
+	tokenCache  *utils.TokenCache
 	isRunning   bool
 	stopChan    chan struct{}
+	positions   map[string]float64
 }
 
-func NewEngine(marketData market.Client, ollama models.OllamaClient, riskMgr *RiskManager) *Engine {
+func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache) *Engine {
 	return &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
+		tokenCache: tokenCache,
 		stopChan:  make(chan struct{}),
+		positions: make(map[string]float64),
 	}
 }
 
@@ -51,6 +56,45 @@ func (e *Engine) Stop() {
 	e.isRunning = false
 }
 
+func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Get market data
+	data, err := e.marketData.GetMarketData(ctx, token)
+	if err != nil {
+		return fmt.Errorf("failed to get market data: %w", err)
+	}
+
+	// Get AI decision
+	decision, err := e.ollama.GenerateTradeDecision(ctx, data)
+	if err != nil {
+		return fmt.Errorf("failed to generate trade decision: %w", err)
+	}
+
+	// Create trade with risk validation
+	trade := &Trade{
+		Token:     token,
+		Amount:    amount,
+		Direction: decision.Action,
+		Price:     data.Price,
+	}
+
+	if err := e.riskMgr.ValidateTrade(ctx, trade); err != nil {
+		return fmt.Errorf("trade validation failed: %w", err)
+	}
+
+	// Update position tracking
+	switch decision.Action {
+	case "BUY":
+		e.positions[token] += amount
+	case "SELL":
+		e.positions[token] = 0
+	}
+
+	return nil
+}
+
 func (e *Engine) monitorMarkets(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -62,11 +106,41 @@ func (e *Engine) monitorMarkets(ctx context.Context) {
 		case <-e.stopChan:
 			return
 		case <-ticker.C:
-			e.processMarketData(ctx)
+			if err := e.processMarketData(ctx); err != nil {
+				continue
+			}
 		}
 	}
 }
 
-func (e *Engine) processMarketData(ctx context.Context) {
-	// Market data processing will be implemented here
+func (e *Engine) processMarketData(ctx context.Context) error {
+	tokens, err := e.tokenCache.GetTopTokens(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get top tokens: %w", err)
+	}
+
+	for _, token := range tokens {
+		data, err := e.marketData.GetMarketData(ctx, token.Symbol)
+		if err != nil {
+			continue
+		}
+
+		decision, err := e.ollama.GenerateTradeDecision(ctx, data)
+		if err != nil {
+			continue
+		}
+
+		if decision.Action == "BUY" && decision.Confidence > 0.7 {
+			if err := e.ExecuteTrade(ctx, token.Symbol, calculateTradeAmount(data.Price)); err != nil {
+				continue
+			}
+		}
+	}
+
+	return nil
+}
+
+func calculateTradeAmount(price float64) float64 {
+	maxAmount := 3.0 // Max amount in USD
+	return maxAmount / price
 }
