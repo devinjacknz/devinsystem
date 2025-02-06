@@ -29,3 +29,11 @@ func (s *Service) LogAISignal(symbol string, signal string, confidence float64) 
 func (s *Service) LogExposure(symbol string, exposure float64) {
 	log.Printf("[EXPOSURE] %s %.2f", symbol, exposure)
 }
+
+func (s *Service) LogSystem(msg string) {
+	log.Printf("[SYSTEM] %s", msg)
+}
+
+func (s *Service) LogError(msg string) {
+	log.Printf("[ERROR] %s", msg)
+}

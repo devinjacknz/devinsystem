@@ -9,7 +9,6 @@ import (
 	"github.com/devinjacknz/devinsystem/internal/exchange"
 	"github.com/devinjacknz/devinsystem/internal/monitoring"
 	"github.com/devinjacknz/devinsystem/internal/risk"
-	"github.com/devinjacknz/devinsystem/internal/wallet"
 )
 
 type Order struct {
@@ -140,7 +139,7 @@ func (e *tradingEngine) monitorMarkets() {
 				}
 				
 				// Log analysis
-				e.monitor.LogAISignal(data.Symbol, analysis.Signal, analysis.Confidence)
+				e.monitor.LogAISignal(data.Symbol, analysis.Trend, analysis.Confidence)
 			}
 		}(ex)
 	}
