@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
+	"time"
 )
 
 const (
@@ -96,6 +98,48 @@ func (j *JupiterDEX) GetMarketPrice(symbol string) (float64, error) {
 	}
 
 	return priceData.Data.Price, nil
+}
+
+func (j *JupiterDEX) updateTokenList() error {
+	j.updateMu.Lock()
+	defer j.updateMu.Unlock()
+
+	// Check if update needed (every 1 hour)
+	if time.Since(j.tokenCache.updatedAt) < time.Hour {
+		return nil
+	}
+
+	resp, err := j.client.Get("https://token.jup.ag/strict")
+	if err != nil {
+		return fmt.Errorf("failed to fetch token list: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var tokens []TokenInfo
+	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
+		return fmt.Errorf("failed to decode token list: %w", err)
+	}
+
+	// Sort by volume and take top 30
+	sort.Slice(tokens, func(i, j int) bool {
+		return tokens[i].Volume24h > tokens[j].Volume24h
+	})
+	if len(tokens) > 30 {
+		tokens = tokens[:30]
+	}
+
+	j.tokenCache.mu.Lock()
+	defer j.tokenCache.mu.Unlock()
+	j.tokenCache.tokens = make(map[string]TokenInfo)
+	for _, token := range tokens {
+		j.tokenCache.tokens[token.Mint] = token
+	}
+	j.tokenCache.updatedAt = time.Now()
+	return nil
 }
 
 func (j *JupiterDEX) ExecuteOrder(order Order) error {
