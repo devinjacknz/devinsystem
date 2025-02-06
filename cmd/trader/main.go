@@ -36,6 +36,9 @@ func main() {
 	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
 	riskMgr := trading.NewRiskManager()
 	
+	// Initialize exchange manager with Jupiter only
+	exchangeMgr := exchange.NewExchangeManager()
+	
 	// Initialize wallet manager
 	walletMgr, err := wallet.NewWalletManager()
 	if err != nil {
