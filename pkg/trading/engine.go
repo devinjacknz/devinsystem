@@ -19,6 +19,7 @@ type Engine struct {
 	tokenCache  *utils.TokenCache
 	mongoRepo   *mongo.Repository
 	wallet      wallet.Manager
+	jupiter     *exchange.JupiterDEX
 	isRunning   bool
 	stopChan    chan struct{}
 	positions   map[string]float64
@@ -32,6 +33,7 @@ func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskMana
 		tokenCache: tokenCache,
 		mongoRepo:  mongoRepo,
 		wallet:     walletMgr,
+		jupiter:    exchange.NewJupiterDEX(),
 		stopChan:  make(chan struct{}),
 		positions: make(map[string]float64),
 	}
@@ -94,9 +96,15 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		return fmt.Errorf("failed to get trading wallet: %w", err)
 	}
 
-	// Execute trade using wallet
-	if err := tradingWallet.Transfer(nil, amount); err != nil {
-		return fmt.Errorf("trade execution failed: %w", err)
+	// Get Jupiter quote
+	quote, err := e.jupiter.GetQuote(ctx, token, "USDC", fmt.Sprintf("%.0f", amount))
+	if err != nil {
+		return fmt.Errorf("failed to get quote: %w", err)
+	}
+
+	// Execute swap with wallet
+	if err := e.jupiter.ExecuteSwap(ctx, quote, tradingWallet); err != nil {
+		return fmt.Errorf("swap execution failed: %w", err)
 	}
 
 	// Update position tracking
