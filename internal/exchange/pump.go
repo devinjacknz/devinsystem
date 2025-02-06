@@ -9,11 +9,21 @@ type PumpFun struct {
 	mu      sync.RWMutex
 	client  interface{}
 	markets map[string]*Market
+	name    string
 }
 
-func NewPumpFun() *PumpFun {
+func (p *PumpFun) Name() string {
+	return p.name
+}
+
+func (p *PumpFun) GetMarketData() (*MarketData, error) {
+	return &MarketData{}, nil
+}
+
+func NewPumpFun(apiURL string) *PumpFun {
 	return &PumpFun{
 		markets: make(map[string]*Market),
+		name:    "Pump.fun",
 	}
 }
 
