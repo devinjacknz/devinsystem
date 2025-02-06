@@ -11,19 +11,29 @@ import (
 
 type Repository struct {
 	client *Client
+	limiter *rate.Limiter
 }
 
 func NewRepository(client *Client) *Repository {
-	return &Repository{client: client}
+	return &Repository{
+		client: client,
+		limiter: rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS
+	}
 }
 
 func (r *Repository) SaveTrade(ctx context.Context, trade *Trade) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
 	collection := r.client.Collection("trades")
 	_, err := collection.InsertOne(ctx, trade)
 	return err
 }
 
 func (r *Repository) SaveMarketData(ctx context.Context, data *MarketData) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
 	collection := r.client.Collection("market_data")
 	_, err := collection.InsertOne(ctx, data)
 	return err
@@ -57,18 +67,27 @@ func (r *Repository) GetMarketData(ctx context.Context, token string, start, end
 }
 
 func (r *Repository) SaveRiskEvent(ctx context.Context, event *RiskEvent) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
 	collection := r.client.Collection("risk_events")
 	_, err := collection.InsertOne(ctx, event)
 	return err
 }
 
 func (r *Repository) SavePerformance(ctx context.Context, perf *Performance) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
 	collection := r.client.Collection("performance")
 	_, err := collection.InsertOne(ctx, perf)
 	return err
 }
 
 func (r *Repository) SaveAIDecision(ctx context.Context, decision *AIDecision) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
 	collection := r.client.Collection("ai_decisions")
 	_, err := collection.InsertOne(ctx, decision)
 	if err != nil {
@@ -78,6 +97,10 @@ func (r *Repository) SaveAIDecision(ctx context.Context, decision *AIDecision) e
 }
 
 func (r *Repository) CreateIndexes(ctx context.Context) error {
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
 	// Market data indexes
 	_, err := r.client.Collection("market_data").Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{"timestamp", -1}}},
@@ -86,6 +109,10 @@ func (r *Repository) CreateIndexes(ctx context.Context) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create market data indexes: %w", err)
+	}
+
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
 	// AI decisions indexes
@@ -98,6 +125,10 @@ func (r *Repository) CreateIndexes(ctx context.Context) error {
 		return fmt.Errorf("failed to create AI decisions indexes: %w", err)
 	}
 
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
 	// Performance indexes
 	_, err = r.client.Collection("performance").Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{"token", 1}, {"start", -1}}},
@@ -107,6 +138,10 @@ func (r *Repository) CreateIndexes(ctx context.Context) error {
 		return fmt.Errorf("failed to create performance indexes: %w", err)
 	}
 
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
 	// Risk events indexes
 	_, err = r.client.Collection("risk_events").Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{"timestamp", -1}}},
@@ -114,6 +149,21 @@ func (r *Repository) CreateIndexes(ctx context.Context) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create risk events indexes: %w", err)
+	}
+
+	if err := r.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
+	// Jupiter trades indexes
+	_, err = r.client.Collection("jupiter_trades").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{"timestamp", -1}}},
+		{Keys: bson.D{{"token", 1}, {"timestamp", -1}}},
+		{Keys: bson.D{{"status", 1}}},
+		{Keys: bson.D{{"tx_hash", 1}}, Options: options.Index().SetUnique(true)},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create jupiter trades indexes: %w", err)
 	}
 
 	return nil
