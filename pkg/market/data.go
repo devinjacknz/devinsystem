@@ -73,13 +73,35 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 
 	// Calculate volume from holder movements
 	volume := calculateVolume(holders)
+	price := calculatePrice(supply, holders)
+	timestamp := time.Now()
 
-	return &MarketData{
+	data := &MarketData{
 		Symbol:    token,
-		Price:     calculatePrice(supply, holders),
+		Price:     price,
 		Volume:    volume,
-		Timestamp: time.Now(),
-	}, nil
+		Timestamp: timestamp,
+	}
+
+	// Save market data
+	if err := c.SaveMarketData(ctx, data); err != nil {
+		return nil, fmt.Errorf("failed to save market data: %w", err)
+	}
+
+	return data, nil
+}
+
+func (c *HeliusClient) SaveMarketData(ctx context.Context, data *MarketData) error {
+	f, err := os.OpenFile("/home/ubuntu/repos/devinsystem/trading.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer f.Close()
+
+	logger := log.New(f, "", log.LstdFlags)
+	logger.Printf("[MARKET] %s Price: %.8f Volume: %.2f Time: %s",
+		data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time.RFC3339))
+	return nil
 }
 
 func (c *HeliusClient) getTokenSupply(ctx context.Context, token string) (uint64, error) {
