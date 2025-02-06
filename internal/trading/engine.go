@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/devinjacknz/devinsystem/internal/ai"
 	"github.com/devinjacknz/devinsystem/internal/exchange"
@@ -125,6 +126,7 @@ func (e *tradingEngine) monitorMarkets() {
 	for _, ex := range e.exchanges {
 		go func(exchange exchange.Exchange) {
 			for {
+				time.Sleep(5 * time.Second)
 				// Get market data
 				data, err := exchange.GetMarketData()
 				if err != nil {
