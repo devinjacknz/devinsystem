@@ -38,22 +38,43 @@ func (j *JupiterDEX) Name() string {
 	return j.name
 }
 
-func (j *JupiterDEX) GetMarketData() (*MarketData, error) {
-	// Get market data for SOL/USDC as default pair
-	const (
-		solMint = "So11111111111111111111111111111111111111112"
-		usdcMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-	)
+func (j *JupiterDEX) GetMarketData() ([]*MarketData, error) {
+	if err := j.updateTokenList(); err != nil {
+		return nil, fmt.Errorf("failed to update token list: %w", err)
+	}
+
+	j.tokenCache.mu.RLock()
+	tokens := make([]TokenInfo, 0, len(j.tokenCache.tokens))
+	for _, token := range j.tokenCache.tokens {
+		tokens = append(tokens, token)
+	}
+	j.tokenCache.mu.RUnlock()
+
+	var marketData []*MarketData
+	for _, token := range tokens {
+		data, err := j.getTokenMarketData(token.Mint)
+		if err != nil {
+			continue // Skip failed tokens but continue
+		}
+		marketData = append(marketData, data)
+		time.Sleep(time.Second) // Respect rate limit
+	}
+	return marketData, nil
+}
+
+func (j *JupiterDEX) getTokenMarketData(mint string) (*MarketData, error) {
+	url := fmt.Sprintf("%s%s?inputMint=%s&outputMint=%s", 
+		JupiterBaseURL, PriceEndpoint, mint,
+		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") // USDC
 	
-	url := fmt.Sprintf("%s%s?inputMint=%s&outputMint=%s", JupiterBaseURL, PriceEndpoint, solMint, usdcMint)
 	resp, err := j.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get market data: %w", err)
+		return nil, fmt.Errorf("failed to get market data for %s: %w", mint, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected status code for %s: %d", mint, resp.StatusCode)
 	}
 
 	var priceData struct {
@@ -63,11 +84,18 @@ func (j *JupiterDEX) GetMarketData() (*MarketData, error) {
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&priceData); err != nil {
-		return nil, fmt.Errorf("failed to decode market data: %w", err)
+		return nil, fmt.Errorf("failed to decode market data for %s: %w", mint, err)
+	}
+
+	j.tokenCache.mu.RLock()
+	tokenInfo, exists := j.tokenCache.tokens[mint]
+	j.tokenCache.mu.RUnlock()
+	if !exists {
+		return nil, fmt.Errorf("token info not found for %s", mint)
 	}
 
 	return &MarketData{
-		Symbol: "SOL/USDC",
+		Symbol: tokenInfo.Symbol,
 		Price:  priceData.Data.Price,
 		Volume: priceData.Data.Volume,
 	}, nil
