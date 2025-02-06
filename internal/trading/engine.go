@@ -117,7 +117,8 @@ func (e *tradingEngine) Start() error {
 	// Start market data monitoring
 	go e.monitorMarkets()
 	
-	return nil
+	// Keep the main thread running
+	select {}
 }
 
 func (e *tradingEngine) monitorMarkets() {
