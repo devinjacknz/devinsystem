@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 )
 
 const (
@@ -15,14 +16,19 @@ const (
 )
 
 type JupiterDEX struct {
-	client  *RateLimitedClient
-	name    string
+	client     *RateLimitedClient
+	name       string
+	tokenCache *TokenCache
+	updateMu   sync.Mutex
 }
 
 func NewJupiterDEX() *JupiterDEX {
 	return &JupiterDEX{
 		client: NewRateLimitedClient(1.0), // 1 request per second for free plan
 		name:   "Jupiter",
+		tokenCache: &TokenCache{
+			tokens: make(map[string]TokenInfo),
+		},
 	}
 }
 
