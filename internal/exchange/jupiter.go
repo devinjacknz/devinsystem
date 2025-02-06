@@ -73,6 +73,9 @@ func (j *JupiterDEX) getTokenMarketData(mint string) (*MarketData, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("rate limit exceeded for %s", mint)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code for %s: %d", mint, resp.StatusCode)
 	}
@@ -92,6 +95,10 @@ func (j *JupiterDEX) getTokenMarketData(mint string) (*MarketData, error) {
 	j.tokenCache.mu.RUnlock()
 	if !exists {
 		return nil, fmt.Errorf("token info not found for %s", mint)
+	}
+
+	if priceData.Data.Price <= 0 {
+		return nil, fmt.Errorf("invalid price for %s: %f", mint, priceData.Data.Price)
 	}
 
 	return &MarketData{
