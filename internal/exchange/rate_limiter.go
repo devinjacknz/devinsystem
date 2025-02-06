@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"time"
