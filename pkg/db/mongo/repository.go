@@ -68,6 +68,15 @@ func (r *Repository) SavePerformance(ctx context.Context, perf *Performance) err
 	return err
 }
 
+func (r *Repository) SaveAIDecision(ctx context.Context, decision *AIDecision) error {
+	collection := r.client.Collection("ai_decisions")
+	_, err := collection.InsertOne(ctx, decision)
+	if err != nil {
+		return fmt.Errorf("failed to save AI decision: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) CreateIndexes(ctx context.Context) error {
 	// Market data indexes
 	_, err := r.client.Collection("market_data").Indexes().CreateMany(ctx, []mongo.IndexModel{

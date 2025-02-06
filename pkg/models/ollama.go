@@ -47,7 +47,7 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	}
 }
 
-func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data *market.MarketData) (*TradeDecision, error) {
+func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data *market.MarketData, mongoRepo *mongo.Repository) (*TradeDecision, error) {
 	systemPrompt := `You are a trading assistant. Analyze the market data and make a trading decision.
 Consider:
 1. Price trends
@@ -102,7 +102,7 @@ Timestamp: %s`, data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time
 	}
 
 	decision, confidence, reasoning := parseTradeDecision(response.Message.Content)
-	return &TradeDecision{
+	tradeDecision := &TradeDecision{
 		Action:     decision,
 		Confidence: confidence,
 		Reasoning:  reasoning,
@@ -110,7 +110,27 @@ Timestamp: %s`, data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time
 			"model":      c.model,
 			"timestamp": time.Now(),
 		},
-	}, nil
+	}
+
+	if mongoRepo != nil {
+		aiDecision := &mongo.AIDecision{
+			Token:       data.Symbol,
+			Timestamp:   time.Now(),
+			FinalAction: decision,
+			Confidence:  confidence,
+			Models: []mongo.ModelDecision{{
+				Name:       "ollama",
+				Action:     decision,
+				Confidence: confidence,
+				Reasoning:  reasoning,
+			}},
+		}
+		if err := mongoRepo.SaveAIDecision(ctx, aiDecision); err != nil {
+			log.Printf("Failed to save AI decision: %v", err)
+		}
+	}
+
+	return tradeDecision, nil
 }
 
 func parseTradeDecision(content string) (string, float64, string) {
