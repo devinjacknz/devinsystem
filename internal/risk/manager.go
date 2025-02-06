@@ -22,31 +22,34 @@ type Manager interface {
 }
 
 type RiskManager struct {
-	mu          sync.RWMutex
-	stopLoss    *StopLoss
-	slippage    *SlippageProtection
-	aiService   ai.Service
-	exposures   map[string]float64
-	maxExposure float64
+	mu                 sync.RWMutex
+	stopLoss           *StopLoss
+	slippage           *SlippageProtection
+	aiService          ai.Service
+	exposures          map[string]float64
+	maxExposure        float64
+	volatilityThreshold float64
 }
 
 func NewManager() Manager {
 	return &RiskManager{
-		stopLoss:    NewStopLoss(),
-		slippage:    NewSlippageProtection(50),
-		aiService:   &ai.MockService{},
-		exposures:   make(map[string]float64),
-		maxExposure: 1000000, // 1M default max exposure
+		stopLoss:           NewStopLoss(),
+		slippage:           NewSlippageProtection(200),
+		aiService:          &ai.MockService{},
+		exposures:          make(map[string]float64),
+		maxExposure:        3000000,
+		volatilityThreshold: 0.5,
 	}
 }
 
 func NewRiskManager(aiService ai.Service, maxExposure float64) *RiskManager {
 	return &RiskManager{
-		stopLoss:    NewStopLoss(),
-		slippage:    NewSlippageProtection(50),
-		aiService:   aiService,
-		exposures:   make(map[string]float64),
-		maxExposure: maxExposure,
+		stopLoss:           NewStopLoss(),
+		slippage:           NewSlippageProtection(200),
+		aiService:          aiService,
+		exposures:          make(map[string]float64),
+		maxExposure:        maxExposure,
+		volatilityThreshold: 0.5,
 	}
 }
 
