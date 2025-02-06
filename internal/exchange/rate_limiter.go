@@ -39,7 +39,7 @@ func (c *RateLimitedClient) Get(url string) (*http.Response, error) {
 
 func (c *RateLimitedClient) Post(url string, contentType string, body []byte) (*http.Response, error) {
 	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}

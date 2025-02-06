@@ -1,10 +1,11 @@
 package exchange
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
+	"os"
 )
 
 const (
@@ -93,9 +94,61 @@ func (j *JupiterDEX) GetMarketPrice(symbol string) (float64, error) {
 }
 
 func (j *JupiterDEX) ExecuteOrder(order Order) error {
+	// Get quote first
 	quoteURL := fmt.Sprintf("%s%s", JupiterBaseURL, QuoteEndpoint)
-	swapURL := fmt.Sprintf("%s%s", JupiterBaseURL, SwapEndpoint)
+	quoteReq := JupiterQuoteRequest{
+		InputMint:   "So11111111111111111111111111111111111111112", // SOL
+		OutputMint:  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+		Amount:      fmt.Sprintf("%.0f", order.Amount * 1e9), // Convert to lamports
+		SlippageBps: 100, // 1% slippage
+	}
 
-	// Implementation will be expanded in next steps
-	return fmt.Errorf("not implemented")
+	quoteBody, err := json.Marshal(quoteReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal quote request: %w", err)
+	}
+
+	resp, err := j.client.Post(quoteURL, "application/json", quoteBody)
+	if err != nil {
+		return fmt.Errorf("failed to get quote: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code for quote: %d", resp.StatusCode)
+	}
+
+	var quoteResp JupiterQuoteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&quoteResp); err != nil {
+		return fmt.Errorf("failed to decode quote response: %w", err)
+	}
+
+	// Execute swap
+	swapURL := fmt.Sprintf("%s%s", JupiterBaseURL, SwapEndpoint)
+	swapReq := JupiterSwapRequest{
+		QuoteResponse:  quoteResp,
+		UserPublicKey:  os.Getenv("wallet"),
+	}
+
+	swapBody, err := json.Marshal(swapReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal swap request: %w", err)
+	}
+
+	resp, err = j.client.Post(swapURL, "application/json", swapBody)
+	if err != nil {
+		return fmt.Errorf("failed to execute swap: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code for swap: %d", resp.StatusCode)
+	}
+
+	var swapResp JupiterSwapResponse
+	if err := json.NewDecoder(resp.Body).Decode(&swapResp); err != nil {
+		return fmt.Errorf("failed to decode swap response: %w", err)
+	}
+
+	return nil
 }
