@@ -37,3 +37,8 @@ func (s *Service) LogSystem(msg string) {
 func (s *Service) LogError(msg string) {
 	log.Printf("[ERROR] %s", msg)
 }
+
+func (s *Service) LogJupiterSwap(inputToken, outputToken string, inputAmount, outputAmount float64, priceImpact float64) {
+	log.Printf("[JUPITER] Swap %f %s -> %f %s (Impact: %.2f%%)",
+		inputAmount, inputToken, outputAmount, outputToken, priceImpact*100)
+}
