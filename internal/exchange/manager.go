@@ -15,8 +15,7 @@ func NewExchangeManager() *ExchangeManager {
 		exchanges: make(map[string]Exchange),
 	}
 
-	manager.exchanges["solana"] = NewSolanaDEX()
-	manager.exchanges["pump"] = NewPumpFun()
+	manager.exchanges["jupiter"] = NewJupiterDEX()
 
 	return manager
 }
