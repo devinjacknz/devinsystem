@@ -21,7 +21,7 @@ type JupiterDEX struct {
 
 func NewJupiterDEX() *JupiterDEX {
 	return &JupiterDEX{
-		client: NewRateLimitedClient(2.0), // 2 requests per second for free plan
+		client: NewRateLimitedClient(1.0), // 1 request per second for free plan
 		name:   "Jupiter",
 	}
 }
