@@ -128,30 +128,55 @@ func (e *tradingEngine) monitorMarkets() {
 			for {
 				time.Sleep(5 * time.Second)
 				
-				data, err := exchange.GetMarketData()
-				if err != nil {
-					e.monitor.LogError(fmt.Sprintf("Failed to get market data from %s: %v", exchange.Name(), err))
-					continue
-				}
-
 				if exchange.Name() == "Jupiter" {
-					e.monitor.LogJupiterSwap(data.Symbol, "USDC", data.Price, data.Volume, 0.1)
+					data, err := exchange.GetMarketData()
+					if err != nil {
+						e.monitor.LogError(fmt.Sprintf("Failed to get market data: %v", err))
+						continue
+					}
+
+					for _, d := range data {
+						e.monitor.LogJupiterSwap(d.Symbol, "USDC", d.Price, d.Volume, 0.1)
+						
+						aiData := ai.MarketData{
+							Symbol: d.Symbol,
+							Price:  d.Price,
+							Volume: d.Volume,
+							Trend:  "",
+						}
+						
+						analysis, err := e.aiService.AnalyzeMarket(aiData)
+						if err != nil {
+							e.monitor.LogError(fmt.Sprintf("Failed to analyze market data for %s: %v", d.Symbol, err))
+							continue
+						}
+						
+						e.monitor.LogAISignal(d.Symbol, analysis.Trend, analysis.Confidence)
+					}
+				} else {
+					data, err := exchange.GetMarketData()
+					if err != nil {
+						e.monitor.LogError(fmt.Sprintf("Failed to get market data from %s: %v", exchange.Name(), err))
+						continue
+					}
+
+					for _, d := range data {
+						aiData := ai.MarketData{
+							Symbol: d.Symbol,
+							Price:  d.Price,
+							Volume: d.Volume,
+							Trend:  "",
+						}
+						
+						analysis, err := e.aiService.AnalyzeMarket(aiData)
+						if err != nil {
+							e.monitor.LogError(fmt.Sprintf("Failed to analyze market data: %v", err))
+							continue
+						}
+						
+						e.monitor.LogAISignal(d.Symbol, analysis.Trend, analysis.Confidence)
+					}
 				}
-				
-				aiData := ai.MarketData{
-					Symbol: data.Symbol,
-					Price:  data.Price,
-					Volume: data.Volume,
-					Trend:  "",
-				}
-				
-				analysis, err := e.aiService.AnalyzeMarket(aiData)
-				if err != nil {
-					e.monitor.LogError(fmt.Sprintf("Failed to analyze market data: %v", err))
-					continue
-				}
-				
-				e.monitor.LogAISignal(data.Symbol, analysis.Trend, analysis.Confidence)
 			}
 		}(ex)
 	}
