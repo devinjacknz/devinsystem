@@ -127,29 +127,30 @@ func (e *tradingEngine) monitorMarkets() {
 		go func(exchange exchange.Exchange) {
 			for {
 				time.Sleep(5 * time.Second)
-				// Get market data
+				
 				data, err := exchange.GetMarketData()
 				if err != nil {
 					e.monitor.LogError(fmt.Sprintf("Failed to get market data from %s: %v", exchange.Name(), err))
 					continue
 				}
+
+				if exchange.Name() == "Jupiter" {
+					e.monitor.LogJupiterSwap(data.Symbol, "USDC", data.Price, data.Volume, 0.1)
+				}
 				
-				// Convert to AI MarketData type
 				aiData := ai.MarketData{
 					Symbol: data.Symbol,
 					Price:  data.Price,
 					Volume: data.Volume,
-					Trend:  "", // Will be determined by AI
+					Trend:  "",
 				}
 				
-				// Analyze with AI
 				analysis, err := e.aiService.AnalyzeMarket(aiData)
 				if err != nil {
 					e.monitor.LogError(fmt.Sprintf("Failed to analyze market data: %v", err))
 					continue
 				}
 				
-				// Log analysis
 				e.monitor.LogAISignal(data.Symbol, analysis.Trend, analysis.Confidence)
 			}
 		}(ex)
