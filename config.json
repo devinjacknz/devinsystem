@@ -13,6 +13,6 @@
     },
     "monitoring": {
         "interval": 5,
-        "log_file": "trading.log"
+        "log_file": "/home/ubuntu/repos/devinsystem/trading.log"
     }
 }
