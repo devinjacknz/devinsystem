@@ -37,3 +37,12 @@ func (s *AIService) AnalyzeMarket(data MarketData) (*Analysis, error) {
 		Signals:    []Signal{},
 	}, nil
 }
+
+func (s *AIService) AnalyzeRisk(data MarketData) (*RiskAnalysis, error) {
+	return &RiskAnalysis{
+		Symbol:        data.Symbol,
+		StopLossPrice: data.Price * 0.95, // 5% below current price
+		RiskLevel:     "MEDIUM",
+		Confidence:    0.8,
+	}, nil
+}
