@@ -19,8 +19,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Initialize MongoDB
+	mongoClient, err := mongo.NewClient("mongodb://localhost:27017", "trading")
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+	mongoRepo := mongo.NewRepository(mongoClient)
+
+	// Create MongoDB indexes
+	if err := mongoRepo.CreateIndexes(ctx); err != nil {
+		log.Fatalf("Failed to create indexes: %v", err)
+	}
+
 	// Initialize components
-	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"))
+	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"), mongoRepo)
 	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
 	riskMgr := trading.NewRiskManager()
 
@@ -45,7 +57,7 @@ func main() {
 	}
 
 	// Initialize trading engine
-	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache)
+	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, mongoRepo)
 
 	// Start trading engine
 	if err := engine.Start(ctx); err != nil {
