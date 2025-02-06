@@ -1,7 +1,9 @@
 package monitoring
 
 import (
+	"fmt"
 	"log"
+	"os"
 )
 
 type Service struct {
@@ -10,8 +12,17 @@ type Service struct {
 
 func NewService() *Service {
 	return &Service{
-		logFile: "trading.log",
+		logFile: "/home/ubuntu/repos/devinsystem/trading.log",
 	}
+}
+
+func (s *Service) init() error {
+	f, err := os.OpenFile(s.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	log.SetOutput(f)
+	return nil
 }
 
 func (s *Service) LogTrade(symbol string, side string, amount float64, price float64) {
