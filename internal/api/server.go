@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/devinjacknz/devintrade/internal/trading"
-	"github.com/devinjacknz/devintrade/internal/wallet"
+	"github.com/devinjacknz/devinsystem/internal/trading"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 	"github.com/gorilla/mux"
 )
 

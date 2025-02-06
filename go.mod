@@ -1,4 +1,4 @@
-module github.com/devinjacknz/devintrade
+module github.com/devinjacknz/devinsystem
 
 go 1.18
 

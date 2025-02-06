@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/devinjacknz/devintrade/internal/ai"
+	"github.com/devinjacknz/devinsystem/internal/ai"
 )
 
 type Order struct {

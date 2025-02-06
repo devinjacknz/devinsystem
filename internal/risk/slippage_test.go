@@ -3,7 +3,7 @@ package risk
 import (
 	"testing"
 	"github.com/stretchr/testify/assert"
-	"github.com/devinjacknz/devintrade/pkg/types"
+	"github.com/devinjacknz/devinsystem/pkg/types"
 )
 
 func TestSlippageChecker_CheckSlippage(t *testing.T) {
