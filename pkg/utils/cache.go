@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"context"
+	"sort"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type TokenInfo struct {
@@ -13,28 +17,47 @@ type TokenInfo struct {
 }
 
 type TokenCache struct {
-	mu      sync.RWMutex
-	tokens  map[string]*TokenInfo
-	expires time.Time
+	mu          sync.RWMutex
+	tokens      map[string]*TokenInfo
+	expires     time.Time
+	ttl         time.Duration
+	limiter     *rate.Limiter
+	maxTokens   int
+	updateFunc  func(context.Context, string) (*TokenInfo, error)
 }
 
-func NewTokenCache(ttl time.Duration) *TokenCache {
+func NewTokenCache(ttl time.Duration, maxTokens int, updateFunc func(context.Context, string) (*TokenInfo, error)) *TokenCache {
 	return &TokenCache{
-		tokens:  make(map[string]*TokenInfo),
-		expires: time.Now().Add(ttl),
+		tokens:     make(map[string]*TokenInfo),
+		expires:    time.Now().Add(ttl),
+		ttl:        ttl,
+		limiter:    rate.NewLimiter(rate.Every(time.Minute), 60),
+		maxTokens:  maxTokens,
+		updateFunc: updateFunc,
 	}
 }
 
-func (c *TokenCache) Get(token string) (*TokenInfo, bool) {
+func (c *TokenCache) Get(ctx context.Context, token string) (*TokenInfo, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	info, exists := c.tokens[token]
+	expired := time.Now().After(c.expires)
+	c.mu.RUnlock()
 
-	if time.Now().After(c.expires) {
-		return nil, false
+	if !exists || expired {
+		if err := c.limiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+
+		info, err := c.updateFunc(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+
+		c.Set(token, info)
+		return info, nil
 	}
 
-	info, ok := c.tokens[token]
-	return info, ok
+	return info, nil
 }
 
 func (c *TokenCache) Set(token string, info *TokenInfo) {
@@ -42,4 +65,58 @@ func (c *TokenCache) Set(token string, info *TokenInfo) {
 	defer c.mu.Unlock()
 
 	c.tokens[token] = info
+}
+
+func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
+	c.mu.RLock()
+	expired := time.Now().After(c.expires)
+	c.mu.RUnlock()
+
+	if expired {
+		if err := c.Refresh(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	tokens := make([]*TokenInfo, 0, len(c.tokens))
+	for _, info := range c.tokens {
+		tokens = append(tokens, info)
+	}
+
+	sort.Slice(tokens, func(i, j int) bool {
+		return tokens[i].Volume > tokens[j].Volume
+	})
+
+	if len(tokens) > c.maxTokens {
+		tokens = tokens[:c.maxTokens]
+	}
+
+	return tokens, nil
+}
+
+func (c *TokenCache) Refresh(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !time.Now().After(c.expires) {
+		return nil
+	}
+
+	for token := range c.tokens {
+		if err := c.limiter.Wait(ctx); err != nil {
+			return err
+		}
+
+		info, err := c.updateFunc(ctx, token)
+		if err != nil {
+			continue
+		}
+		c.tokens[token] = info
+	}
+
+	c.expires = time.Now().Add(c.ttl)
+	return nil
 }
