@@ -131,8 +131,16 @@ func (e *tradingEngine) monitorMarkets() {
 					continue
 				}
 				
+				// Convert to AI MarketData type
+				aiData := ai.MarketData{
+					Symbol: data.Symbol,
+					Price:  data.Price,
+					Volume: data.Volume,
+					Trend:  "", // Will be determined by AI
+				}
+				
 				// Analyze with AI
-				analysis, err := e.aiService.AnalyzeMarket(data)
+				analysis, err := e.aiService.AnalyzeMarket(aiData)
 				if err != nil {
 					e.monitor.LogError(fmt.Sprintf("Failed to analyze market data: %v", err))
 					continue
