@@ -11,9 +11,13 @@ type Service struct {
 }
 
 func NewService() *Service {
-	return &Service{
+	s := &Service{
 		logFile: "/home/ubuntu/repos/devinsystem/trading.log",
 	}
+	if err := s.init(); err != nil {
+		log.Printf("[ERROR] Failed to initialize monitoring service: %v", err)
+	}
+	return s
 }
 
 func (s *Service) init() error {
