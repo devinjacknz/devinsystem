@@ -15,16 +15,14 @@ const (
 )
 
 type JupiterDEX struct {
-	client  *http.Client
+	client  *RateLimitedClient
 	name    string
 }
 
 func NewJupiterDEX() *JupiterDEX {
 	return &JupiterDEX{
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		name: "Jupiter",
+		client: NewRateLimitedClient(2.0), // 2 requests per second for free plan
+		name:   "Jupiter",
 	}
 }
 
