@@ -11,6 +11,7 @@ type DeepSeekClient struct {
 	endpoint    string
 	model       string
 	temperature float64
+	apiKey      string
 }
 
 type DeepSeekRequest struct {

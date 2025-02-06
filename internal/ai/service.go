@@ -1,8 +1,6 @@
 package ai
 
 import (
-	"fmt"
-	"net/http"
 )
 
 type Analysis struct {
@@ -19,24 +17,23 @@ type Signal struct {
 	Confidence float64
 }
 
-type Service struct {
+type AIService struct {
 	ollamaURL     string
 	deepseekModel string
 }
 
-func NewService(ollamaURL, deepseekModel string) *Service {
-	return &Service{
+func NewService(ollamaURL, deepseekModel string) *AIService {
+	return &AIService{
 		ollamaURL:     ollamaURL,
 		deepseekModel: deepseekModel,
 	}
 }
 
-func (s *Service) AnalyzeMarket(data MarketData) (*Analysis, error) {
-	modelConfig := fmt.Sprintf(`{
-		"model": "%s",
-		"temperature": 0.1
-	}`, s.deepseekModel)
-	
-	// Implementation details...
-	return &Analysis{}, nil
+func (s *AIService) AnalyzeMarket(data MarketData) (*Analysis, error) {
+	return &Analysis{
+		Symbol:     data.Symbol,
+		Trend:      "NEUTRAL",
+		Confidence: 0.8,
+		Signals:    []Signal{},
+	}, nil
 }

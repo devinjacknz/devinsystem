@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"log"
-	"time"
 )
 
 type Service struct {
