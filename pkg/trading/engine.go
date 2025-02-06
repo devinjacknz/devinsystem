@@ -18,18 +18,20 @@ type Engine struct {
 	riskMgr     *RiskManager
 	tokenCache  *utils.TokenCache
 	mongoRepo   *mongo.Repository
+	wallet      wallet.Manager
 	isRunning   bool
 	stopChan    chan struct{}
 	positions   map[string]float64
 }
 
-func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache, mongoRepo *mongo.Repository) *Engine {
+func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache, mongoRepo *mongo.Repository, walletMgr wallet.Manager) *Engine {
 	return &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
 		tokenCache: tokenCache,
 		mongoRepo:  mongoRepo,
+		wallet:     walletMgr,
 		stopChan:  make(chan struct{}),
 		positions: make(map[string]float64),
 	}
@@ -84,6 +86,17 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 
 	if err := e.riskMgr.ValidateTrade(ctx, trade); err != nil {
 		return fmt.Errorf("trade validation failed: %w", err)
+	}
+
+	// Get trading wallet
+	tradingWallet, err := e.wallet.GetWallet(wallet.TradingWallet)
+	if err != nil {
+		return fmt.Errorf("failed to get trading wallet: %w", err)
+	}
+
+	// Execute trade using wallet
+	if err := tradingWallet.Transfer(nil, amount); err != nil {
+		return fmt.Errorf("trade execution failed: %w", err)
 	}
 
 	// Update position tracking

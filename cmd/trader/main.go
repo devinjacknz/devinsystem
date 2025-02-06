@@ -35,6 +35,16 @@ func main() {
 	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"), mongoRepo)
 	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
 	riskMgr := trading.NewRiskManager()
+	
+	// Initialize wallet manager
+	walletMgr, err := wallet.NewWalletManager()
+	if err != nil {
+		log.Fatalf("Failed to initialize wallet manager: %v", err)
+	}
+	
+	if err := walletMgr.CreateWallet(wallet.TradingWallet); err != nil {
+		log.Fatalf("Failed to create trading wallet: %v", err)
+	}
 
 	// Initialize token cache with 1-hour TTL and 30 token limit
 	tokenCache := utils.NewTokenCache(time.Hour, 30, func(ctx context.Context, token string) (*utils.TokenInfo, error) {
@@ -57,7 +67,7 @@ func main() {
 	}
 
 	// Initialize trading engine
-	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, mongoRepo)
+	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, mongoRepo, walletMgr)
 
 	// Start trading engine
 	if err := engine.Start(ctx); err != nil {
