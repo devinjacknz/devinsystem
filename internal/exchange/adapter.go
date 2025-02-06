@@ -8,7 +8,7 @@ type Exchange interface {
 	Name() string
 	GetMarketPrice(symbol string) (float64, error)
 	ExecuteOrder(order Order) error
-	GetMarketData() (*MarketData, error)
+	GetMarketData() ([]*MarketData, error)
 }
 
 type Order struct {

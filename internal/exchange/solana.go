@@ -16,8 +16,8 @@ func (dex *SolanaDEX) Name() string {
 	return dex.name
 }
 
-func (dex *SolanaDEX) GetMarketData() (*MarketData, error) {
-	return &MarketData{}, nil
+func (dex *SolanaDEX) GetMarketData() ([]*MarketData, error) {
+	return []*MarketData{}, nil
 }
 
 type Market struct {
