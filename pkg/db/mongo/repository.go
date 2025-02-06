@@ -67,3 +67,45 @@ func (r *Repository) SavePerformance(ctx context.Context, perf *Performance) err
 	_, err := collection.InsertOne(ctx, perf)
 	return err
 }
+
+func (r *Repository) CreateIndexes(ctx context.Context) error {
+	// Market data indexes
+	_, err := r.client.Collection("market_data").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{"timestamp", -1}}},
+		{Keys: bson.D{{"token", 1}, {"timestamp", -1}}},
+		{Keys: bson.D{{"volume", -1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create market data indexes: %w", err)
+	}
+
+	// AI decisions indexes
+	_, err = r.client.Collection("ai_decisions").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{"timestamp", -1}}},
+		{Keys: bson.D{{"token", 1}, {"final_action", 1}}},
+		{Keys: bson.D{{"confidence", -1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create AI decisions indexes: %w", err)
+	}
+
+	// Performance indexes
+	_, err = r.client.Collection("performance").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{"token", 1}, {"start", -1}}},
+		{Keys: bson.D{{"ai_accuracy", -1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create performance indexes: %w", err)
+	}
+
+	// Risk events indexes
+	_, err = r.client.Collection("risk_events").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{"timestamp", -1}}},
+		{Keys: bson.D{{"token", 1}, {"type", 1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create risk events indexes: %w", err)
+	}
+
+	return nil
+}
