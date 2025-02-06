@@ -17,6 +17,7 @@ func NewExchangeManager(solanaURL, pumpURL string) *ExchangeManager {
 
 	manager.exchanges["solana"] = NewSolanaDEX(solanaURL)
 	manager.exchanges["pump"] = NewPumpFun(pumpURL)
+	manager.exchanges["jupiter"] = NewJupiterDEX()
 
 	return manager
 }
