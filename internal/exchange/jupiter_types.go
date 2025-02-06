@@ -1,5 +1,10 @@
 package exchange
 
+import (
+	"sync"
+	"time"
+)
+
 type JupiterQuoteRequest struct {
 	InputMint   string `json:"inputMint"`
 	OutputMint  string `json:"outputMint"`
@@ -29,4 +34,21 @@ type JupiterSwapRequest struct {
 type JupiterSwapResponse struct {
 	SwapTransaction string `json:"swapTransaction"`
 	Message         string `json:"message,omitempty"`
+}
+
+type TokenInfo struct {
+	Symbol    string  `json:"symbol"`
+	Mint      string  `json:"mint"`
+	Volume24h float64 `json:"volume24h"`
+}
+
+type TokenList struct {
+	Tokens    []TokenInfo
+	UpdatedAt time.Time
+}
+
+type TokenCache struct {
+	mu        sync.RWMutex
+	tokens    map[string]TokenInfo  // mint -> info
+	updatedAt time.Time
 }
