@@ -71,7 +71,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse amount: %w", err)
 		}
-		price = float64(amount) / 1e9
+		price = float64(amount) / math.Pow10(supply.Value.Decimals)
 	}
 
 	holders, err := c.getLargestTokenHolders(ctx, token)
@@ -83,7 +83,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	var volume float64
 	for _, holder := range holders {
 		amount, _ := parseAmount(holder.Amount)
-		volume += float64(amount) / 1e9
+		volume += float64(amount) / math.Pow10(supply.Value.Decimals)
 	}
 
 	data := &MarketData{
