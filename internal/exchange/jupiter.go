@@ -8,16 +8,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"golang.org/x/time/rate"
 )
 
 const (
-	maxRequestsPerSecond = 1
+	maxRequestsPerSecond = 1 // Free plan limit
 	requestTimeout      = 10 * time.Second
-	retryAttempts      = 3
-	retryDelay         = time.Second
+	retryAttempts      = 5 // Increased retries
+	retryDelay         = 500 * time.Millisecond // Reduced delay for faster recovery
+	maxBackoff         = 5 * time.Second // Maximum backoff time
 )
 
 type JupiterDEX struct {
@@ -42,6 +44,7 @@ type QuoteResponse struct {
 type SwapRequest struct {
 	QuoteResponse
 	UserPublicKey string `json:"userPublicKey"`
+	SlippageBps  int    `json:"slippageBps"`
 }
 
 type SwapResponse struct {
@@ -63,6 +66,9 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
+	var lastErr error
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
+
 	reqBody := &QuoteRequest{
 		InputMint:  inputMint,
 		OutputMint: outputMint,
@@ -75,24 +81,40 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 		return nil, fmt.Errorf("failed to marshal quote request: %w", err)
 	}
 
-	resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", bytes.NewReader(body))
-	if err != nil {
-		log.Printf("[JUPITER] Failed to get quote from API: %v", err)
-		return nil, fmt.Errorf("failed to get quote: %w", err)
-	}
-	defer resp.Body.Close()
+	log.Printf("[JUPITER] Starting quote request with wallet: %s", os.Getenv("WALLET"))
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[JUPITER] Quote API returned non-200 status: %d, body: %s", resp.StatusCode, string(body))
-		return nil, fmt.Errorf("quote API returned status %d", resp.StatusCode)
-	}
+		resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", bytes.NewReader(body))
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get quote: %w", err)
+			backoff := time.Duration(attempt) * retryDelay
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			log.Printf("[JUPITER] Quote attempt %d/%d failed: %v, retrying in %v", 
+				attempt, retryAttempts, err, backoff)
+			time.Sleep(backoff)
+			continue
+		}
+		defer resp.Body.Close()
 
-	var quote QuoteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&quote); err != nil {
-		log.Printf("[JUPITER] Failed to decode quote response: %v", err)
-		return nil, fmt.Errorf("failed to decode quote response: %w", err)
+		if resp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(resp.Body)
+			lastErr = fmt.Errorf("quote API returned status %d: %s", resp.StatusCode, respBody)
+			continue
+		}
+
+		var quote QuoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quote); err != nil {
+			lastErr = fmt.Errorf("failed to decode quote response: %w", err)
+			continue
+		}
+
+		log.Printf("[JUPITER] Quote successful on attempt %d/%d", attempt, retryAttempts)
+		return &quote, nil
 	}
+	
+	log.Printf("[JUPITER] All quote attempts failed: %v", lastErr)
+	return nil, fmt.Errorf("failed to get quote after %d attempts: %w", retryAttempts, lastErr)
 
 	log.Printf("[JUPITER] Successfully received quote: input=%s output=%s price=%.4f", 
 		quote.InputMint, quote.OutputMint, quote.Price)
@@ -121,6 +143,7 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 	swapReq := &SwapRequest{
 		QuoteResponse:  *quote,
 		UserPublicKey: order.Wallet,
+		SlippageBps:  50, // 0.5% slippage tolerance
 	}
 
 	body, err := json.Marshal(swapReq)
@@ -129,11 +152,30 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		return fmt.Errorf("failed to marshal swap request: %w", err)
 	}
 
-	resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
-	if err != nil {
-		log.Printf("[JUPITER] Failed to execute swap: %v", err)
-		return fmt.Errorf("failed to execute swap: %w", err)
+	var lastErr error
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
+		resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
+		if err == nil {
+			defer resp.Body.Close()
+			var swapResult SwapResponse
+			if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
+				lastErr = fmt.Errorf("failed to decode swap response: %w", err)
+				continue
+			}
+			log.Printf("[JUPITER] Swap executed successfully: txHash=%s", swapResult.TxHash)
+			return nil
+		}
+		lastErr = err
+		backoff := time.Duration(attempt) * retryDelay
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+		log.Printf("[JUPITER] Swap attempt %d/%d failed: %v, retrying in %v", 
+			attempt, retryAttempts, err, backoff)
+		time.Sleep(backoff)
 	}
+	log.Printf("[JUPITER] All swap attempts failed: %v", lastErr)
+	return fmt.Errorf("failed to execute swap after %d attempts: %w", retryAttempts, lastErr)
 	defer resp.Body.Close()
 
 	var swapResult SwapResponse
