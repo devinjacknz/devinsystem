@@ -2,10 +2,12 @@ package utils
 
 import (
 	"context"
+	"log"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/pkg/logging"
 	"golang.org/x/time/rate"
 )
 
@@ -70,21 +72,21 @@ func (c *TokenCache) Set(token string, info *TokenInfo) {
 func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
 	start := time.Now()
 	defer func() {
-		log.Printf("%s Token cache operation took %v", utils.LogMarkerPerf, time.Since(start))
+		log.Printf("%s Token cache operation took %v", logging.LogMarkerPerf, time.Since(start))
 	}()
 
-	log.Printf("%s Checking token cache status", utils.LogMarkerSystem)
+	log.Printf("%s Checking token cache status", logging.LogMarkerSystem)
 	c.mu.RLock()
 	expired := time.Now().After(c.expires)
 	c.mu.RUnlock()
 
 	if expired {
-		log.Printf("%s Token cache expired, refreshing...", utils.LogMarkerSystem)
+		log.Printf("%s Token cache expired, refreshing...", logging.LogMarkerSystem)
 		if err := c.Refresh(ctx); err != nil {
-			log.Printf("%s Failed to refresh token cache: %v", utils.LogMarkerError, err)
+			log.Printf("%s Failed to refresh token cache: %v", logging.LogMarkerError, err)
 			return nil, err
 		}
-		log.Printf("%s Token cache refreshed successfully", utils.LogMarkerSystem)
+		log.Printf("%s Token cache refreshed successfully", logging.LogMarkerSystem)
 	}
 
 	c.mu.RLock()
@@ -111,15 +113,15 @@ func (c *TokenCache) Refresh(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	defer func() {
-		log.Printf("%s Token cache refresh took %v", utils.LogMarkerPerf, time.Since(start))
+		log.Printf("%s Token cache refresh took %v", logging.LogMarkerPerf, time.Since(start))
 	}()
 
 	if !time.Now().After(c.expires) {
-		log.Printf("%s Token cache still valid, skipping refresh", utils.LogMarkerSystem)
+		log.Printf("%s Token cache still valid, skipping refresh", logging.LogMarkerSystem)
 		return nil
 	}
 	
-	log.Printf("%s Starting token cache refresh", utils.LogMarkerSystem)
+	log.Printf("%s Starting token cache refresh", logging.LogMarkerSystem)
 
 	for token := range c.tokens {
 		if err := c.limiter.Wait(ctx); err != nil {
