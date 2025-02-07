@@ -10,11 +10,12 @@ type Exchange interface {
 }
 
 type Order struct {
-	Symbol    string
-	Side      string
-	Amount    float64
-	Price     float64
-	OrderType string
+	Symbol    string  // Token mint address
+	Side      string  // BUY or SELL
+	Amount    float64 // Amount in base token
+	Price     float64 // Price in USDC
+	OrderType string  // MARKET only for Jupiter
+	Wallet    string  // Wallet public key for trade execution
 }
 
 type SolanaAdapter struct {

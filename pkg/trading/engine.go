@@ -3,6 +3,7 @@ package trading
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -95,6 +96,7 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		Amount:    amount,
 		Price:     data.Price,
 		OrderType: "MARKET",
+		Wallet:    os.Getenv("WALLET"),
 	}); err != nil {
 		return fmt.Errorf("swap execution failed: %w", err)
 	}

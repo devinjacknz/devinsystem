@@ -42,7 +42,7 @@ type SwapResponse struct {
 
 func NewJupiterDEX() *JupiterDEX {
 	return &JupiterDEX{
-		limiter: rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS
+		limiter: rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
 		client:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -92,7 +92,7 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 	// Execute swap with wallet
 	swapReq := &SwapRequest{
 		QuoteResponse:  *quote,
-		UserPublicKey: os.Getenv("WALLET"),
+		UserPublicKey: order.Wallet,
 	}
 
 	body, err := json.Marshal(swapReq)
