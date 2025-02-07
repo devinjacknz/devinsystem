@@ -152,28 +152,42 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		return fmt.Errorf("failed to marshal swap request: %w", err)
 	}
 
-	var lastErr error
+	var (
+		lastErr error
+		swapResult SwapResponse
+	)
+
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
-		resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
-		if err == nil {
-			defer resp.Body.Close()
-			var swapResult SwapResponse
-			if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
-				lastErr = fmt.Errorf("failed to decode swap response: %w", err)
-				continue
+		var resp *http.Response
+		resp, err = j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
+		if err != nil {
+			lastErr = err
+			backoff := time.Duration(attempt) * retryDelay
+			if backoff > maxBackoff {
+				backoff = maxBackoff
 			}
-			log.Printf("[JUPITER] Swap executed successfully: txHash=%s", swapResult.TxHash)
-			return nil
+			log.Printf("[JUPITER] Swap attempt %d/%d failed: %v, retrying in %v", 
+				attempt, retryAttempts, err, backoff)
+			time.Sleep(backoff)
+			continue
 		}
-		lastErr = err
-		backoff := time.Duration(attempt) * retryDelay
-		if backoff > maxBackoff {
-			backoff = maxBackoff
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(resp.Body)
+			lastErr = fmt.Errorf("swap API returned status %d: %s", resp.StatusCode, respBody)
+			continue
 		}
-		log.Printf("[JUPITER] Swap attempt %d/%d failed: %v, retrying in %v", 
-			attempt, retryAttempts, err, backoff)
-		time.Sleep(backoff)
+
+		if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
+			lastErr = fmt.Errorf("failed to decode swap response: %w", err)
+			continue
+		}
+
+		log.Printf("[JUPITER] Swap executed successfully: txHash=%s", swapResult.TxHash)
+		return nil
 	}
+
 	log.Printf("[JUPITER] All swap attempts failed: %v", lastErr)
 	return fmt.Errorf("failed to execute swap after %d attempts: %w", retryAttempts, lastErr)
 	defer resp.Body.Close()

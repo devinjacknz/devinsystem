@@ -50,7 +50,7 @@ type tokenAccountBalance struct {
 	} `json:"value"`
 }
 
-func NewHeliusClient(rpcEndpoint string) *HeliusClient {
+func NewHeliusClient(rpcEndpoint string) Client {
 	if rpcEndpoint == "" {
 		rpcEndpoint = os.Getenv("RPC_ENDPOINT")
 	}

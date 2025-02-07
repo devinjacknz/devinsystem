@@ -9,8 +9,8 @@ import (
 )
 
 type FallbackClient struct {
-	primary   Client
-	fallback  Client
+	primary   *HeliusClient
+	fallback  *HeliusClient
 	retries   int
 	backoff   time.Duration
 }
