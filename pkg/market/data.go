@@ -50,10 +50,13 @@ type tokenAccountBalance struct {
 }
 
 func NewHeliusClient(rpcEndpoint string) *HeliusClient {
+	if rpcEndpoint == "" {
+		rpcEndpoint = os.Getenv("RPC_ENDPOINT")
+	}
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
-		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS limit
+		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
 	}
 }
 
