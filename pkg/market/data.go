@@ -80,10 +80,20 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		return nil, fmt.Errorf("failed to get token holders: %w", err)
 	}
 
+	// Calculate volume using the same decimals as price
 	var volume float64
+	decimals := 9 // Default to 9 decimals
+	if token == "So11111111111111111111111111111111111111112" {
+		decimals = 9 // SOL uses 9 decimals
+	} else {
+		var supply tokenAccountBalance
+		if err := json.Unmarshal(response.Result, &supply); err == nil {
+			decimals = supply.Value.Decimals
+		}
+	}
 	for _, holder := range holders {
 		amount, _ := parseAmount(holder.Amount)
-		volume += float64(amount) / math.Pow10(supply.Value.Decimals)
+		volume += float64(amount) / math.Pow10(decimals)
 	}
 
 	data := &MarketData{
