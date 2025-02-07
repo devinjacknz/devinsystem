@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/devinjacknz/devinsystem/pkg/utils"
