@@ -12,7 +12,7 @@ import (
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/trading"
-	"github.com/devinjacknz/devinsystem/pkg/utils"
+	"github.com/devinjacknz/devinsystem/pkg/logging"
 )
 
 func main() {
@@ -21,8 +21,8 @@ func main() {
 	defer cancel()
 
 	// Configure logging
-	log.Printf("%s Starting trading system...", utils.LogMarkerSystem)
-	log.Printf("%s Configuration:", utils.LogMarkerSystem)
+	log.Printf("%s Starting trading system...", logging.LogMarkerSystem)
+	log.Printf("%s Configuration:", logging.LogMarkerSystem)
 	log.Printf("  • Wallet: %s", os.Getenv("WALLET"))
 	log.Printf("  • RPC Endpoint: %s", os.Getenv("RPC_ENDPOINT"))
 	log.Printf("  • Ollama URL: %s", os.Getenv("OLLAMA_URL"))
@@ -64,7 +64,7 @@ func main() {
 	// Initialize trading engine with Jupiter DEX only
 	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache)
 
-	log.Printf("%s Starting trading engine with Jupiter DEX integration", utils.LogMarkerSystem)
+	log.Printf("%s Starting trading engine with Jupiter DEX integration", logging.LogMarkerSystem)
 	if err := engine.Start(ctx); err != nil {
 		log.Fatalf("Failed to start trading engine: %v", err)
 	}
@@ -74,6 +74,6 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Printf("%s Shutting down trading system...", utils.LogMarkerSystem)
+	log.Printf("%s Shutting down trading system...", logging.LogMarkerSystem)
 	engine.Stop()
 }

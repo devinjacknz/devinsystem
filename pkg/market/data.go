@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devinjacknz/devinsystem/pkg/utils"
+	"github.com/devinjacknz/devinsystem/pkg/logging"
 	"golang.org/x/time/rate"
 )
 
@@ -66,15 +66,15 @@ func NewHeliusClient(rpcEndpoint string) Client {
 func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*MarketData, error) {
 	start := time.Now()
 	defer func() {
-		log.Printf("%s Market data retrieval for %s took %v", utils.LogMarkerPerf, token, time.Since(start))
+		log.Printf("%s Market data retrieval for %s took %v", logging.LogMarkerPerf, token, time.Since(start))
 	}()
 
 	if err := c.limiter.Wait(ctx); err != nil {
-		log.Printf("%s Rate limit exceeded for %s: %v", utils.LogMarkerError, token, err)
+		log.Printf("%s Rate limit exceeded for %s: %v", logging.LogMarkerError, token, err)
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	log.Printf("%s Fetching market data for %s...", utils.LogMarkerMarket, token)
+	log.Printf("%s Fetching market data for %s...", logging.LogMarkerMarket, token)
 
 	// Get token supply
 	supply, err := c.getTokenSupply(ctx, token)
@@ -99,7 +99,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		Volume:    volume,
 		Timestamp: timestamp,
 	}
-	log.Printf("%s Retrieved data for %s: Price=%.8f Volume=%.2f Time=%s", utils.LogMarkerMarket,
+	log.Printf("%s Retrieved data for %s: Price=%.8f Volume=%.2f Time=%s", logging.LogMarkerMarket,
 		token, price, volume, timestamp.Format(time.RFC3339))
 
 	// Save market data
@@ -169,25 +169,25 @@ func (c *HeliusClient) getLargestTokenHolders(ctx context.Context, token string)
 }
 
 func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, response *rpcResponse) error {
-	log.Printf("%s Making request: method=%s", utils.LogMarkerSystem, request.Method)
+	log.Printf("%s Making request: method=%s", logging.LogMarkerSystem, request.Method)
 	
 	body, err := json.Marshal(request)
 	if err != nil {
-		log.Printf("%s Failed to marshal RPC request: %v", utils.LogMarkerError, err)
+		log.Printf("%s Failed to marshal RPC request: %v", logging.LogMarkerError, err)
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	for attempt := 1; attempt <= 3; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, "POST", c.rpcEndpoint, bytes.NewReader(body))
 		if err != nil {
-			log.Printf("%s Failed to create RPC request: %v", utils.LogMarkerError, err)
+			log.Printf("%s Failed to create RPC request: %v", logging.LogMarkerError, err)
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			log.Printf("%s Failed to send RPC request (attempt %d/3): %v", utils.LogMarkerError, attempt, err)
+			log.Printf("%s Failed to send RPC request (attempt %d/3): %v", logging.LogMarkerError, attempt, err)
 			if attempt < 3 {
 				time.Sleep(time.Second)
 				continue
@@ -198,7 +198,7 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			log.Printf("%s RPC returned non-200 status: %d, body: %s", utils.LogMarkerError, resp.StatusCode, string(body))
+			log.Printf("%s RPC returned non-200 status: %d, body: %s", logging.LogMarkerError, resp.StatusCode, string(body))
 			if attempt < 3 {
 				time.Sleep(time.Second)
 				continue
@@ -207,16 +207,16 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
-			log.Printf("%s Failed to decode RPC response: %v", utils.LogMarkerError, err)
+			log.Printf("%s Failed to decode RPC response: %v", logging.LogMarkerError, err)
 			return fmt.Errorf("failed to decode response: %w", err)
 		}
 
 		if response.Error != nil {
-			log.Printf("%s RPC error: %s", utils.LogMarkerError, response.Error.Message)
+			log.Printf("%s RPC error: %s", logging.LogMarkerError, response.Error.Message)
 			return fmt.Errorf("RPC error: %s", response.Error.Message)
 		}
 
-		log.Printf("%s Request successful: method=%s", utils.LogMarkerSystem, request.Method)
+		log.Printf("%s Request successful: method=%s", logging.LogMarkerSystem, request.Method)
 		return nil
 	}
 	return fmt.Errorf("all retry attempts failed")
