@@ -70,11 +70,23 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 	return &quote, nil
 }
 
-func (j *JupiterDEX) ExecuteSwap(ctx context.Context, quote *QuoteResponse, wallet Wallet) error {
+func (j *JupiterDEX) ExecuteOrder(ctx context.Context, order *Order) error {
 	if err := j.limiter.Wait(ctx); err != nil {
 		return fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
+	// Get quote for the order
+	quote, err := j.GetQuote(ctx, order.Symbol, "USDC", fmt.Sprintf("%.0f", order.Amount))
+	if err != nil {
+		return fmt.Errorf("failed to get quote: %w", err)
+	}
+
+	// Execute swap
+	if err := j.ExecuteSwap(ctx, quote, order.Wallet); err != nil {
+		return fmt.Errorf("failed to execute swap: %w", err)
+	}
+
+	return nil
 	req := &SwapRequest{
 		QuoteResponse:  *quote,
 		UserPublicKey: wallet.GetPublicKey(),

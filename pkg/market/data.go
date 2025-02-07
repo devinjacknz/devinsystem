@@ -17,7 +17,7 @@ type HeliusClient struct {
 	httpClient  *http.Client
 	limiter     *rate.Limiter
 	mu          sync.RWMutex
-	mongoRepo   *mongo.Repository
+	// No MongoDB repository needed
 }
 
 type rpcRequest struct {
@@ -47,12 +47,11 @@ type tokenAccountBalance struct {
 	} `json:"value"`
 }
 
-func NewHeliusClient(rpcEndpoint string, mongoRepo *mongo.Repository) *HeliusClient {
+func NewHeliusClient(rpcEndpoint string) *HeliusClient {
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		limiter:     rate.NewLimiter(rate.Every(time.Minute), 60),
-		mongoRepo:   mongoRepo,
 	}
 }
 
@@ -94,18 +93,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 }
 
 func (c *HeliusClient) SaveMarketData(ctx context.Context, data *MarketData) error {
-	if c.mongoRepo != nil {
-		mongoData := &mongo.MarketData{
-			Token:     data.Symbol,
-			Price:     data.Price,
-			Volume:    data.Volume,
-			Timestamp: data.Timestamp,
-			Metrics:   make(map[string]interface{}),
-		}
-		return c.mongoRepo.SaveMarketData(ctx, mongoData)
-	}
-
-	// Fallback to file logging if MongoDB is not configured
+	// Use file logging for market data
 	f, err := os.OpenFile("/home/ubuntu/repos/devinsystem/trading.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
