@@ -128,7 +128,7 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 }
 
 func (e *Engine) monitorMarkets(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -163,7 +163,7 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 			continue
 		}
 
-		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.2 {
+		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.1 {
 			amount := calculateTradeAmount(data.Price)
 			if decision.Action == "SELL" {
 				if position, exists := e.positions[token.Symbol]; exists && position > 0 {
@@ -195,6 +195,6 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 }
 
 func calculateTradeAmount(price float64) float64 {
-	maxAmount := 50.0 // Max amount in USD for each trade
+	maxAmount := 100.0 // Max amount in USD for each trade
 	return maxAmount / price
 }
