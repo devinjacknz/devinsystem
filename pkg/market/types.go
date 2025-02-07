@@ -15,11 +15,6 @@ type MarketData struct {
 type Client interface {
 	GetMarketData(ctx context.Context, token string) (*MarketData, error)
 	GetTokenList(ctx context.Context) ([]string, error)
-	GetTopTokens(ctx context.Context) ([]Token, error)
+	GetTopTokens(ctx context.Context) ([]string, error)
 	ValidateConnection(ctx context.Context) error
-}
-
-type Token struct {
-	Symbol string
-	Price  float64
 }
