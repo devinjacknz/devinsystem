@@ -34,6 +34,9 @@ type Message struct {
 
 type Options struct {
 	Temperature float64 `json:"temperature"`
+	TopP        float64 `json:"top_p"`
+	TopK        int     `json:"top_k"`
+	Seed        int     `json:"seed"`
 }
 
 type ollamaResponse struct {
@@ -60,48 +63,36 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading bot. Analyze market data and output EXACTLY in this format:
+	systemPrompt := `You are a trading bot. Analyze market data and respond with EXACTLY 3 lines:
+Line 1: BUY, SELL, or NOTHING
+Line 2: A confidence number between 0.1 and 0.9
+Line 3: A brief reason for the decision
 
-For buys:
+Example 1:
 BUY
 0.6
-Price increase detected with volume support
+Price trending up with volume support
 
-For sells:
+Example 2:
 SELL
 0.7
-Price dropping with increasing volume
+Price dropping with high volume
 
-For no action:
+Example 3:
 NOTHING
 0.1
-Insufficient market activity
+No clear trading signals`
 
-Rules:
-1. First line must be BUY, SELL, or NOTHING
-2. Second line must be confidence (0.1-0.9)
-3. Third line must be reasoning
-4. No other format is allowed`
+	prompt := fmt.Sprintf(`Based on this market data, output EXACTLY 3 lines in this format:
+Line 1: BUY or SELL or NOTHING
+Line 2: number between 0.1 and 0.9
+Line 3: brief reason
 
-	prompt := fmt.Sprintf(`Analyze this market data and output a trading decision:
+Current data:
 Token: %s
 Price: %.8f SOL
 Volume: %.2f SOL
-Time: %s
-
-Example valid responses:
-
-BUY
-0.6
-Strong volume increase detected with upward price movement
-
-SELL
-0.7
-Price dropping with high volume, indicating selling pressure
-
-NOTHING
-0.1
-No clear trading signals at current price level`, 
+Time: %s`, 
 		marketData.Symbol, marketData.Price, marketData.Volume, 
 		marketData.Timestamp.Format(time.RFC3339))
 
@@ -113,7 +104,10 @@ No clear trading signals at current price level`,
 		},
 		Stream: false,
 		Options: Options{
-			Temperature: 0.2, // Lower temperature for more consistent responses
+			Temperature: 0.1,  // Very low temperature for consistent format
+			TopP:        0.1,  // Reduce randomness
+			TopK:        10,   // Limit token choices
+			Seed:        1234, // Fixed seed for reproducibility
 		},
 	}
 
@@ -137,7 +131,20 @@ No clear trading signals at current price level`,
 		log.Printf("%s Failed to load model: %v", logging.LogMarkerError, err)
 		return nil, err
 	}
-	loadResp.Body.Close()
+	defer loadResp.Body.Close()
+
+	// Verify model loaded successfully
+	var loadResult struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(loadResp.Body).Decode(&loadResult); err != nil {
+		log.Printf("%s Failed to decode model load response: %v", logging.LogMarkerError, err)
+		return nil, err
+	}
+	if loadResult.Status != "success" {
+		log.Printf("%s Model load failed with status: %s", logging.LogMarkerError, loadResult.Status)
+		return nil, fmt.Errorf("model load failed: %s", loadResult.Status)
+	}
 
 	log.Printf("%s Generating trade decision for %s using %s model", logging.LogMarkerAI, marketData.Symbol, c.model)
 	body, err := json.Marshal(request)
@@ -172,12 +179,32 @@ No clear trading signals at current price level`,
 	// Log raw response for debugging
 	log.Printf("%s Raw model response:\n%s", logging.LogMarkerAI, response.Message.Content)
 
-	// Clean up response by removing any markdown formatting
+	// Clean up response by removing any markdown formatting and extra whitespace
 	cleanContent := strings.ReplaceAll(response.Message.Content, "```", "")
 	cleanContent = strings.TrimSpace(cleanContent)
 
-	// Parse the cleaned response
-	decision, confidence, reasoning := parseTradeDecision(cleanContent)
+	// Split into lines and ensure we have exactly 3 non-empty lines
+	lines := strings.Split(cleanContent, "\n")
+	var validLines []string
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			validLines = append(validLines, trimmed)
+		}
+	}
+
+	if len(validLines) < 3 {
+		log.Printf("%s Invalid response format - expected 3 lines, got %d", logging.LogMarkerError, len(validLines))
+		return &TradeDecision{
+			Action:     "NOTHING",
+			Confidence: 0.1,
+			Reasoning:  fmt.Sprintf("Invalid response format - got %d lines", len(validLines)),
+			Model:      c.model,
+			Timestamp:  time.Now(),
+		}, nil
+	}
+
+	// Parse the cleaned response using first 3 valid lines
+	decision, confidence, reasoning := parseTradeDecision(strings.Join(validLines[:3], "\n"))
 	tradeDecision := &TradeDecision{
 		Action:     decision,
 		Confidence: confidence,
