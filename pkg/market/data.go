@@ -181,6 +181,26 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 	return nil
 }
 
+func (c *HeliusClient) GetTopTokens(ctx context.Context) ([]Token, error) {
+	tokens, err := c.GetTokenList(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token list: %w", err)
+	}
+
+	var result []Token
+	for _, symbol := range tokens[:30] { // Get top 30 tokens
+		data, err := c.GetMarketData(ctx, symbol)
+		if err != nil {
+			continue
+		}
+		result = append(result, Token{
+			Symbol: symbol,
+			Price:  data.Price,
+		})
+	}
+	return result, nil
+}
+
 func (c *HeliusClient) GetTokenList(ctx context.Context) ([]string, error) {
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)

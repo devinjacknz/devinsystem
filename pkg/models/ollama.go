@@ -47,7 +47,11 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	}
 }
 
-func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data *market.MarketData) (*TradeDecision, error) {
+func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface{}) (*TradeDecision, error) {
+	marketData, ok := data.(*market.MarketData)
+	if !ok {
+		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
+	}
 	systemPrompt := `You are a trading assistant. Analyze the market data and make a trading decision.
 Consider:
 1. Price trends
@@ -61,7 +65,7 @@ Include a confidence score (0-100) in your analysis.`
 Symbol: %s
 Price: %.8f
 Volume: %.2f
-Timestamp: %s`, data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time.RFC3339))
+Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketData.Timestamp.Format(time.RFC3339))
 
 	request := ollamaRequest{
 		Model: c.model,
