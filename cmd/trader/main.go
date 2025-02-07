@@ -33,7 +33,7 @@ func main() {
 	log.SetOutput(f)
 
 	// Initialize components
-	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"))
+	marketData := market.NewFallbackClient(os.Getenv("RPC_ENDPOINT"))
 	
 	// Initialize Ollama with DeepSeek R1 model
 	ollama := models.NewOllamaClient(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
