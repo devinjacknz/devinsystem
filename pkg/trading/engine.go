@@ -14,6 +14,7 @@ import (
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/logging"
+	"github.com/devinjacknz/devinsystem/pkg/utils"
 )
 
 type Engine struct {
@@ -21,7 +22,7 @@ type Engine struct {
 	marketData  market.Client
 	ollama      models.Client
 	riskMgr     risk.Manager
-	tokenCache  *utils.TokenCache
+	tokenCache  *utils.TokenCache // Keep utils for TokenCache type
 	jupiter     *exchange.JupiterDEX
 	isRunning   bool
 	stopChan    chan struct{}
@@ -160,16 +161,16 @@ func (e *Engine) monitorMarkets(ctx context.Context) {
 func (e *Engine) processMarketData(ctx context.Context) error {
 	start := time.Now()
 	defer func() {
-		log.Printf("%s Market data processing took %v", utils.LogMarkerPerf, time.Since(start))
+		log.Printf("%s Market data processing took %v", logging.LogMarkerPerf, time.Since(start))
 	}()
 
-	log.Printf("%s Starting market data processing cycle", utils.LogMarkerMarket)
+	log.Printf("%s Starting market data processing cycle", logging.LogMarkerMarket)
 	tokens, err := e.tokenCache.GetTopTokens(ctx)
 	if err != nil {
-		log.Printf("%s Failed to get top tokens: %v", utils.LogMarkerError, err)
+		log.Printf("%s Failed to get top tokens: %v", logging.LogMarkerError, err)
 		return fmt.Errorf("failed to get top tokens: %w", err)
 	}
-	log.Printf("%s Retrieved %d tokens for analysis", utils.LogMarkerMarket, len(tokens))
+	log.Printf("%s Retrieved %d tokens for analysis", logging.LogMarkerMarket, len(tokens))
 
 	for _, token := range tokens {
 		data, err := e.marketData.GetMarketData(ctx, token.Symbol)
