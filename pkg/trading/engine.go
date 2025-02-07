@@ -72,8 +72,12 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		log.Printf("%s Trade execution for %s took %v", logging.LogMarkerPerf, token, time.Since(start))
 	}()
 
+	wallet := os.Getenv("WALLET")
+	if wallet == "" {
+		return fmt.Errorf("wallet address not configured")
+	}
 	log.Printf("%s Starting trade execution for %s, amount: %.4f using wallet: %s", logging.LogMarkerTrade, 
-		token, amount, os.Getenv("WALLET"))
+		token, amount, wallet)
 
 	// Get market data with timing
 	marketStart := time.Now()
@@ -113,14 +117,16 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 	// Track swap execution time
 	swapStart := time.Now()
 	// Execute order through Jupiter DEX with wallet
-	if err := e.jupiter.ExecuteOrder(exchange.Order{
+	order := exchange.Order{
 		Symbol:    token,
 		Side:      decision.Action,
 		Amount:    amount,
 		Price:     data.Price,
 		OrderType: "MARKET",
-		Wallet:    os.Getenv("WALLET"),
-	}); err != nil {
+		Wallet:    wallet,
+	}
+	log.Printf("%s Executing order: %+v", logging.LogMarkerTrade, order)
+	if err := e.jupiter.ExecuteOrder(order); err != nil {
 		log.Printf("%s Swap execution failed: %v", logging.LogMarkerError, err)
 		return fmt.Errorf("swap execution failed: %w", err)
 	}

@@ -28,6 +28,11 @@ func main() {
 	log.Printf("  • RPC Endpoint: %s", os.Getenv("RPC_ENDPOINT"))
 	log.Printf("  • Ollama URL: %s", os.Getenv("OLLAMA_URL"))
 	log.Printf("  • Ollama Model: %s", os.Getenv("OLLAMA_MODEL"))
+	
+	if os.Getenv("WALLET") == "" || os.Getenv("RPC_ENDPOINT") == "" || 
+		os.Getenv("OLLAMA_URL") == "" || os.Getenv("OLLAMA_MODEL") == "" {
+		log.Fatal("Missing required environment variables")
+	}
 	logFile := os.Getenv("LOG_FILE")
 	if logFile == "" {
 		logFile = "trading.log"
