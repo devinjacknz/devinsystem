@@ -53,7 +53,7 @@ func NewHeliusClient(rpcEndpoint string) *HeliusClient {
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
-		limiter:     rate.NewLimiter(rate.Every(time.Minute), 60),
+		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS limit
 	}
 }
 

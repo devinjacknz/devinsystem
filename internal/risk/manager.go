@@ -59,6 +59,12 @@ func NewRiskManager(aiService ai.Service, maxExposure float64) *RiskManager {
 	}
 }
 
+func (rm *RiskManager) CheckExposure(symbol string) (float64, error) {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.currentRisks[symbol], nil
+}
+
 func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
 	// Check AI risk analysis
 	riskAnalysis, err := rm.aiService.AnalyzeRisk(ai.MarketData{

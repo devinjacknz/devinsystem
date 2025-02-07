@@ -26,11 +26,16 @@ func (m *MockMarketClient) GetTokenList(ctx context.Context) ([]string, error) {
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockMarketClient) GetTopTokens(ctx context.Context) ([]market.Token, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]market.Token), args.Error(1)
+}
+
 type MockOllamaClient struct {
 	mock.Mock
 }
 
-func (m *MockOllamaClient) GenerateTradeDecision(ctx context.Context, data *market.MarketData) (*models.TradeDecision, error) {
+func (m *MockOllamaClient) GenerateTradeDecision(ctx context.Context, data interface{}) (*models.TradeDecision, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(*models.TradeDecision), args.Error(1)
 }
