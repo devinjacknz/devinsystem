@@ -6,28 +6,29 @@ import (
 )
 
 type ExchangeManager struct {
-	mu        sync.RWMutex
-	exchanges map[string]Exchange
+	mu      sync.RWMutex
+	jupiter *JupiterDEX
 }
 
 func NewExchangeManager() *ExchangeManager {
-	manager := &ExchangeManager{
-		exchanges: make(map[string]Exchange),
+	return &ExchangeManager{
+		jupiter: NewJupiterDEX(),
 	}
+}
 
-	manager.exchanges["jupiter"] = NewJupiterDEX()
-
-	return manager
+func (m *ExchangeManager) GetJupiterDEX() *JupiterDEX {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.jupiter
 }
 
 func (m *ExchangeManager) GetExchange(name string) (Exchange, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	exchange, exists := m.exchanges[name]
-	if !exists {
-		return nil, errors.New("exchange not found")
+	if name != "jupiter" {
+		return nil, errors.New("only Jupiter DEX is supported")
 	}
 
-	return exchange, nil
+	return m.jupiter, nil
 }
