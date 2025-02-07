@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/devinjacknz/devinsystem/internal/risk"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/trading"
@@ -24,10 +25,13 @@ func main() {
 	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"))
 	
 	// Initialize Ollama with DeepSeek R1 model
-	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
+	ollama := models.NewOllamaClient(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
 
-	// Initialize risk manager
-	riskMgr := risk.NewManager()
+	// Initialize wallet manager
+	walletMgr := wallet.NewManager(os.Getenv("WALLET"))
+
+	// Initialize risk manager with 3M max exposure for meme coins
+	riskMgr := risk.NewRiskManager(nil, 3_000_000)
 
 	// Initialize token cache with 1-hour TTL and 30 token limit
 	tokenCache := utils.NewTokenCache(time.Hour, 30, func(ctx context.Context, token string) (*utils.TokenInfo, error) {
@@ -43,10 +47,17 @@ func main() {
 		}, nil
 	})
 
-	// Initialize trading engine
+	// Initialize trading engine with Jupiter DEX only
 	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache)
 
-	// Start trading engine
+	// Configure logging
+	logFile := os.Getenv("LOG_FILE")
+	if logFile == "" {
+		logFile = "trading.log"
+	}
+	log.SetOutput(os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644))
+
+	log.Println("[SYSTEM] Starting trading engine with Jupiter DEX integration")
 	if err := engine.Start(ctx); err != nil {
 		log.Fatalf("Failed to start trading engine: %v", err)
 	}
@@ -56,6 +67,6 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutting down trading system...")
+	log.Println("[SYSTEM] Shutting down trading system...")
 	engine.Stop()
 }
