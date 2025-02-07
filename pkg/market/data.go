@@ -17,88 +17,77 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type JupiterClient struct {
-	httpClient *http.Client
-	limiter    *rate.Limiter
+type HeliusClient struct {
+	rpcEndpoint string
+	httpClient  *http.Client
+	limiter     *rate.Limiter
 }
 
-func NewJupiterClient() *JupiterClient {
-	return &JupiterClient{
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		limiter:    rate.NewLimiter(rate.Every(time.Second), 1),
+func NewHeliusClient(rpcEndpoint string) *HeliusClient {
+	if rpcEndpoint == "" {
+		rpcEndpoint = "https://eclipse.helius-rpc.com/"
+	}
+	return &HeliusClient{
+		rpcEndpoint: rpcEndpoint,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		limiter:     rate.NewLimiter(rate.Every(time.Second), 1),
 	}
 }
 
-func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, error) {
+func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*MarketData, error) {
 	if err := c.limiter.Wait(ctx); err != nil {
-		return 0, fmt.Errorf("rate limit exceeded: %w", err)
+		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	tokenID := GetTokenAddress(token)
-	url := fmt.Sprintf("https://price.jup.ag/v4/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", tokenID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	// Get token supply from Helius RPC
+	request := rpcRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "getTokenSupply",
+		Params:  []interface{}{GetTokenAddress(token)},
+	}
+
+	var response rpcResponse
+	if err := c.doRequest(ctx, request, &response); err != nil {
+		return nil, fmt.Errorf("failed to get token supply: %w", err)
+	}
+
+	var supply tokenAccountBalance
+	if err := json.Unmarshal(response.Result, &supply); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal supply: %w", err)
+	}
+
+	amount, err := parseAmount(supply.Value.Amount)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to parse amount: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	// Convert lamports to SOL (1 SOL = 1e9 lamports)
+	price := float64(amount) / 1e9
+
+	// Get token holders for volume from Helius RPC
+	holders, err := c.getLargestTokenHolders(ctx, token)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get price: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var priceResp struct {
-		Data map[string]struct {
-			Price     float64 `json:"price"`
-			ID        string  `json:"id"`
-			Mint      string  `json:"mint"`
-			VsToken   string  `json:"vsToken"`
-			VsTokenID string  `json:"vsTokenId"`
-		} `json:"data"`
+		log.Printf("%s Failed to get token holders: %v", logging.LogMarkerError, err)
+		return nil, fmt.Errorf("failed to get token holders: %w", err)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&priceResp); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
+	// Calculate volume from holder movements
+	var volume float64
+	for _, holder := range holders {
+		amount, _ := parseAmount(holder.Amount)
+		volume += float64(amount) / 1e9
 	}
 
-	if priceData, ok := priceResp.Data[token]; ok && priceData.Price > 0 {
-		log.Printf("%s Retrieved price for %s: %.8f USDC", logging.LogMarkerMarket, token, priceData.Price)
-		return priceData.Price, nil
-	}
-	return 0, fmt.Errorf("token not found in response or invalid price")
-}
-
-func (c *JupiterClient) GetVolume(ctx context.Context, token string) (float64, error) {
-	if err := c.limiter.Wait(ctx); err != nil {
-		return 0, fmt.Errorf("rate limit exceeded: %w", err)
+	data := &MarketData{
+		Symbol:    token,
+		Price:     price,
+		Volume:    volume,
+		Timestamp: time.Now(),
 	}
 
-	tokenID := GetTokenAddress(token)
-	url := fmt.Sprintf("https://price.jup.ag/v4/token-volume?id=%s", tokenID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get volume: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var volumeResp struct {
-		Volume24h float64 `json:"volume24h"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&volumeResp); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if volumeResp.Volume24h > 0 {
-		log.Printf("%s Retrieved 24h volume for %s: %.2f USDC", logging.LogMarkerMarket, token, volumeResp.Volume24h)
-		return volumeResp.Volume24h, nil
-	}
-	return 0, fmt.Errorf("invalid volume")
+	log.Printf("%s Retrieved data for %s: price=%.8f volume=%.2f", logging.LogMarkerMarket, token, price, volume)
+	return data, nil
 }
 
 type HeliusClient struct {

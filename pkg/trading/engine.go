@@ -42,9 +42,9 @@ func NewEngine(marketData market.Client, ollama models.Client, riskMgr risk.Mana
 
 	// Initialize token cache with default tokens
 	defaultTokens := []string{
-		"So11111111111111111111111111111111111111112", // Wrapped SOL
-		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+		"SOL", // Native SOL
+		"USDC", // USDC
+		"USDT", // USDT
 	}
 
 	for _, token := range defaultTokens {

@@ -2,9 +2,10 @@ package market
 
 // TokenMap maps token symbols to their Solana addresses
 var TokenMap = map[string]string{
-	"SOL":  "So11111111111111111111111111111111111111112", // Wrapped SOL
-	"USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-	"USDT": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+	"SOL":  "So11111111111111111111111111111111111111112",
+	"WSOL": "So11111111111111111111111111111111111111112",
+	"USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+	"USDT": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 }
 
 // GetTokenAddress returns the Solana address for a given token symbol
