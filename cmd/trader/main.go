@@ -8,12 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/devinjacknz/devinsystem/pkg/agents"
+	"github.com/devinjacknz/devinsystem/internal/risk"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/trading"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
-	"github.com/devinjacknz/devinsystem/internal/wallet"
 )
 
 func main() {
@@ -25,24 +24,10 @@ func main() {
 	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"))
 	
 	// Initialize Ollama with DeepSeek R1 model
-	modelFactory := models.NewModelFactory()
-	ollama := models.NewOllamaModel("deepseek-r1")
-	if err := modelFactory.RegisterModel("ollama", ollama); err != nil {
-		log.Fatalf("Failed to register Ollama model: %v", err)
-	}
+	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
 
 	// Initialize risk manager
-	riskMgr := trading.NewRiskManager()
-	
-	// Initialize wallet manager
-	walletMgr, err := wallet.NewWalletManager()
-	if err != nil {
-		log.Fatalf("Failed to initialize wallet manager: %v", err)
-	}
-	
-	if err := walletMgr.CreateWallet(wallet.TradingWallet); err != nil {
-		log.Fatalf("Failed to create trading wallet: %v", err)
-	}
+	riskMgr := risk.NewManager()
 
 	// Initialize token cache with 1-hour TTL and 30 token limit
 	tokenCache := utils.NewTokenCache(time.Hour, 30, func(ctx context.Context, token string) (*utils.TokenInfo, error) {
@@ -59,7 +44,7 @@ func main() {
 	})
 
 	// Initialize trading engine
-	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, walletMgr)
+	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache)
 
 	// Start trading engine
 	if err := engine.Start(ctx); err != nil {
