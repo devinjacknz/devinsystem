@@ -4,9 +4,9 @@ import (
 	"testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/devinjacknz/devintrade/internal/risk"
-	"github.com/devinjacknz/devintrade/internal/wallet"
-	"github.com/devinjacknz/devintrade/internal/exchange"
+	"github.com/devinjacknz/devinsystem/internal/risk"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
+	"github.com/devinjacknz/devinsystem/internal/exchange"
 )
 
 type MockRiskManager struct {

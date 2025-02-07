@@ -1,4 +1,4 @@
-module github.com/devinjacknz/devintrade
+module github.com/devinjacknz/devinsystem
 
 go 1.18
 
@@ -7,6 +7,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/time v0.10.0
 )
 
 require (

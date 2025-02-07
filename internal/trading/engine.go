@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/devinjacknz/devintrade/internal/exchange"
-	"github.com/devinjacknz/devintrade/internal/risk"
-	"github.com/devinjacknz/devintrade/internal/wallet"
+	"github.com/devinjacknz/devinsystem/internal/exchange"
+	"github.com/devinjacknz/devinsystem/internal/risk"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 )
 
 type Order struct {
