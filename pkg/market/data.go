@@ -37,7 +37,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	}
 
 	// Use getTokenSupply for all tokens
-	request = rpcRequest{
+	request := rpcRequest{
 		Jsonrpc: "2.0",
 		ID:      1,
 		Method:  "getTokenSupply",
