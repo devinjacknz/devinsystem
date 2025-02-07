@@ -64,36 +64,27 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading bot. Output EXACTLY 3 lines in this format:
+	systemPrompt := `You are a trading bot. Respond with exactly 3 lines:
+Line 1: BUY or SELL or NOTHING
+Line 2: A number between 0.1 and 0.9
+Line 3: A reason
 
+Example response:
 BUY
 0.6
-Volume spike detected
+Price up 2%
 
-OR
+Do not include any other text. Only output these 3 lines.`
 
-SELL
-0.7
-Price dropping
-
-OR
-
-NOTHING
-0.1
-No signals
-
-No other text allowed. Only these 3 lines.`
-
-	prompt := fmt.Sprintf(`Based on this market data, output EXACTLY 3 lines in this format:
-Line 1: BUY or SELL or NOTHING
-Line 2: number between 0.1 and 0.9
-Line 3: brief reason
-
-Current data:
+	prompt := fmt.Sprintf(`Analyze this data and respond with exactly 3 lines:
 Token: %s
 Price: %.8f SOL
 Volume: %.2f SOL
-Time: %s`, 
+
+Remember:
+- Line 1: BUY/SELL/NOTHING
+- Line 2: 0.1-0.9
+- Line 3: reason`,
 		marketData.Symbol, marketData.Price, marketData.Volume, 
 		marketData.Timestamp.Format(time.RFC3339))
 
@@ -153,11 +144,12 @@ Time: %s`,
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/generate", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/chat", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -171,13 +163,20 @@ Time: %s`,
 	}
 
 	var response ollamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	// Read and log raw response for debugging
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("%s Failed to read response body: %v", logging.LogMarkerError, err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	log.Printf("%s Raw API response: %s", logging.LogMarkerAI, string(respBody))
+
+	if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(&response); err != nil {
 		log.Printf("%s Failed to decode Ollama response: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Log raw response for debugging
-	log.Printf("%s Raw model response:\n%s", logging.LogMarkerAI, response.Message.Content)
+	log.Printf("%s Model response content: %s", logging.LogMarkerAI, response.Message.Content)
 
 	// Clean up response by removing any markdown formatting and extra whitespace
 	cleanContent := strings.ReplaceAll(response.Message.Content, "```", "")
