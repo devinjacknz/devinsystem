@@ -8,7 +8,6 @@ import (
 
 	"github.com/devinjacknz/devinsystem/internal/exchange"
 	"github.com/devinjacknz/devinsystem/internal/risk"
-	"github.com/devinjacknz/devinsystem/internal/wallet"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
@@ -18,9 +17,8 @@ type Engine struct {
 	mu          sync.RWMutex
 	marketData  market.Client
 	ollama      models.Client
-	riskMgr     *RiskManager
+	riskMgr     risk.Manager
 	tokenCache  *utils.TokenCache
-	wallet      wallet.Manager
 	jupiter     *exchange.JupiterDEX
 	isRunning   bool
 	stopChan    chan struct{}
@@ -91,20 +89,8 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		return fmt.Errorf("trade validation failed: %w", err)
 	}
 
-	// Get trading wallet
-	tradingWallet, err := e.wallet.GetWallet(wallet.TradingWallet)
-	if err != nil {
-		return fmt.Errorf("failed to get trading wallet: %w", err)
-	}
-
-	// Get Jupiter quote
-	quote, err := e.jupiter.GetQuote(ctx, token, "USDC", fmt.Sprintf("%.0f", amount))
-	if err != nil {
-		return fmt.Errorf("failed to get quote: %w", err)
-	}
-
-	// Execute swap with wallet
-	if err := e.jupiter.ExecuteOrder(Order{
+	// Execute order through Jupiter DEX
+	if err := e.jupiter.ExecuteOrder(exchange.Order{
 		Symbol:    token,
 		Side:      decision.Action,
 		Amount:    amount,

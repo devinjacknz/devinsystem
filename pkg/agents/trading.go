@@ -100,7 +100,17 @@ func (t *TradingAgent) processMarketData(ctx context.Context) error {
 }
 
 func (t *TradingAgent) executeTrade(ctx context.Context, token string, amount float64) error {
-	if err := t.riskMgr.ValidateTrade(ctx, token, amount); err != nil {
+	data, err := t.marketData.GetMarketData(ctx, token)
+	if err != nil {
+		return fmt.Errorf("failed to get market data: %w", err)
+	}
+
+	if err := t.riskMgr.ValidateTrade(ctx, &risk.Trade{
+		Token:     token,
+		Amount:    amount,
+		Direction: "BUY",
+		Price:     data.Price,
+	}); err != nil {
 		return fmt.Errorf("trade validation failed: %w", err)
 	}
 
@@ -109,7 +119,13 @@ func (t *TradingAgent) executeTrade(ctx context.Context, token string, amount fl
 		return fmt.Errorf("failed to get quote: %w", err)
 	}
 
-	if err := t.jupiter.ExecuteSwap(ctx, quote); err != nil {
+	if err := t.jupiter.ExecuteOrder(exchange.Order{
+		Symbol:    token,
+		Side:      "BUY",
+		Amount:    amount,
+		Price:     quote.Price,
+		OrderType: "MARKET",
+	}); err != nil {
 		return fmt.Errorf("swap execution failed: %w", err)
 	}
 
