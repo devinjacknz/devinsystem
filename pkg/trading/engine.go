@@ -140,7 +140,7 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 }
 
 func (e *Engine) monitorMarkets(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second) // Respect RPC rate limits
+	ticker := time.NewTicker(1 * time.Second) // More frequent monitoring for testing
 	defer ticker.Stop()
 
 	for {
