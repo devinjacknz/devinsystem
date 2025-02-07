@@ -105,12 +105,12 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 	loadReq.Header.Set("Content-Type", "application/json")
 
 	log.Printf("%s Loading model %s...", logging.LogMarkerAI, c.model)
-	resp, err := c.httpClient.Do(loadReq)
+	loadResp, err := c.httpClient.Do(loadReq)
 	if err != nil {
 		log.Printf("%s Failed to load model: %v", logging.LogMarkerError, err)
 		return nil, err
 	}
-	resp.Body.Close()
+	loadResp.Body.Close()
 
 	log.Printf("%s Generating trade decision for %s using %s model", logging.LogMarkerAI, marketData.Symbol, c.model)
 	body, err := json.Marshal(request)
