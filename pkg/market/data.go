@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/devinjacknz/devinsystem/pkg/logging"
@@ -36,23 +36,14 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	// For SOL token, use getBalance instead of getTokenSupply
-	var request rpcRequest
-	if token == "So11111111111111111111111111111111111111112" {
-		// For SOL token, use getBalance
-		request = rpcRequest{
-			Jsonrpc: "2.0",
-			ID:      1,
-			Method:  "getBalance",
-			Params:  []interface{}{os.Getenv("WALLET")},
-		}
-	} else {
-		request = rpcRequest{
-			Jsonrpc: "2.0",
-			ID:      1,
-			Method:  "getTokenSupply",
-			Params:  []interface{}{GetTokenAddress(token)},
-		}
+	// Use getTokenSupply for all tokens
+	request = rpcRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "getTokenSupply",
+		Params:  []interface{}{GetTokenAddress(token), map[string]interface{}{
+			"commitment": "finalized",
+		}},
 	}
 
 	var response rpcResponse
