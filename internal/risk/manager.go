@@ -26,6 +26,7 @@ type Trade struct {
 type Manager interface {
 	ValidateTrade(ctx context.Context, trade *Trade) error
 	CheckExposure(symbol string) (float64, error)
+	UpdateExposure(symbol string, amount float64) error
 	UpdateStopLoss(symbol string, currentPrice float64) error
 }
 
@@ -38,7 +39,7 @@ type RiskManager struct {
 	maxExposure float64
 }
 
-func NewManager() *RiskManager {
+func NewManager() Manager {
 	return &RiskManager{
 		stopLoss:    NewStopLoss(),
 		slippage:    NewSlippageProtection(50),
