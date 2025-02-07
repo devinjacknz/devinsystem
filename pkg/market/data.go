@@ -17,6 +17,51 @@ import (
 	"golang.org/x/time/rate"
 )
 
+type JupiterClient struct {
+	httpClient *http.Client
+	limiter    *rate.Limiter
+}
+
+func NewJupiterClient() *JupiterClient {
+	return &JupiterClient{
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+		limiter:    rate.NewLimiter(rate.Every(time.Second), 1),
+	}
+}
+
+func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, error) {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return 0, fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
+	url := fmt.Sprintf("https://price-api.jup.ag/v6/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get price: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var priceResp struct {
+		Data map[string]struct {
+			Price float64 `json:"price"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&priceResp); err != nil {
+		return 0, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if priceData, ok := priceResp.Data[token]; ok {
+		return priceData.Price, nil
+	}
+	return 0, fmt.Errorf("token not found in response")
+}
+
 type HeliusClient struct {
 	rpcEndpoint string
 	fallbackRPC string
@@ -148,21 +193,84 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 
 	log.Printf("%s Fetching market data for %s...", logging.LogMarkerMarket, token)
 
-	// Get token supply
-	supply, err := c.getTokenSupply(ctx, token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token supply: %w", err)
+	// Get token account info
+	request := rpcRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "getTokenAccountsByOwner",
+		Params: []interface{}{
+			token,
+			map[string]string{
+				"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+			},
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
 	}
 
-	// Get largest token holders
-	holders, err := c.getLargestTokenHolders(ctx, token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token holders: %w", err)
+	var response rpcResponse
+	if err := c.doRequest(ctx, request, &response); err != nil {
+		log.Printf("%s Failed to get token account info: %v", logging.LogMarkerError, err)
+		return nil, fmt.Errorf("failed to get token account info: %w", err)
 	}
 
-	// Calculate volume from holder movements
-	volume := calculateVolume(holders)
-	price := calculatePrice(supply, holders)
+	var accountInfo struct {
+		Value []struct {
+			Account struct {
+				Data struct {
+					Parsed struct {
+						Info struct {
+							TokenAmount struct {
+								Amount   string  `json:"amount"`
+								Decimals int     `json:"decimals"`
+								UiAmount float64 `json:"uiAmount"`
+							} `json:"tokenAmount"`
+						} `json:"info"`
+					} `json:"parsed"`
+				} `json:"data"`
+			} `json:"account"`
+		} `json:"value"`
+	}
+
+	if err := json.Unmarshal(response.Result, &accountInfo); err != nil {
+		log.Printf("%s Failed to parse token account info: %v", logging.LogMarkerError, err)
+		return nil, fmt.Errorf("failed to parse token account info: %w", err)
+	}
+
+	if len(accountInfo.Value) == 0 {
+		log.Printf("%s No token accounts found for %s", logging.LogMarkerError, token)
+		return nil, fmt.Errorf("no token accounts found")
+	}
+
+	// Calculate total supply and volume
+	var totalSupply float64
+	var volume float64
+	for _, acc := range accountInfo.Value {
+		amount := acc.Account.Data.Parsed.Info.TokenAmount.UiAmount
+		totalSupply += amount
+		if amount > 0 {
+			volume += amount
+		}
+	}
+
+	if totalSupply <= 0 {
+		log.Printf("%s Invalid total supply for %s: %.8f", logging.LogMarkerError, token, totalSupply)
+		return nil, fmt.Errorf("invalid total supply")
+	}
+
+	// Get SOL price in USDC using Jupiter API
+	jupiterClient := NewJupiterClient()
+	price, err := jupiterClient.GetPrice(ctx, token)
+	if err != nil {
+		log.Printf("%s Failed to get price from Jupiter, using fallback: %v", logging.LogMarkerError, err)
+		price = 1.0 // Default to 1 SOL = 1 USDC for testing
+	}
+
+	if price <= 0 {
+		log.Printf("%s Invalid price for %s: %.8f", logging.LogMarkerError, token, price)
+		return nil, fmt.Errorf("invalid price")
+	}
 	timestamp := time.Now()
 
 	data := &MarketData{
@@ -376,19 +484,23 @@ func calculatePrice(supply uint64, holders []tokenHolder) float64 {
 		return 0
 	}
 
-	// Use largest holder's amount as reference
-	largestHolder := holders[0]
-	amount, _ := parseAmount(largestHolder.Amount)
-	
-	// Simple price calculation based on supply and largest holder
-	return float64(amount) / float64(supply)
+	// Get total value in lamports (1e9 lamports = 1 SOL)
+	var totalValue float64
+	for _, holder := range holders {
+		amount, _ := parseAmount(holder.Amount)
+		totalValue += float64(amount)
+	}
+
+	// Convert to SOL (1 SOL = 1e9 lamports)
+	return totalValue / 1e9
 }
 
 func calculateVolume(holders []tokenHolder) float64 {
 	var volume float64
 	for _, holder := range holders {
 		amount, _ := parseAmount(holder.Amount)
-		volume += float64(amount)
+		// Convert lamports to SOL
+		volume += float64(amount) / 1e9
 	}
 	return volume
 }
