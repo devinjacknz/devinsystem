@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -20,7 +21,8 @@ type HeliusClient struct {
 	httpClient  *http.Client
 	limiter     *rate.Limiter
 	mu          sync.RWMutex
-	// No MongoDB repository needed
+	failures    int32
+	lastFailure time.Time
 }
 
 type rpcRequest struct {
