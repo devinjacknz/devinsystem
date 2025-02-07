@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -70,7 +71,8 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 	return &quote, nil
 }
 
-func (j *JupiterDEX) ExecuteOrder(ctx context.Context, order *Order) error {
+func (j *JupiterDEX) ExecuteOrder(order Order) error {
+	ctx := context.Background()
 	if err := j.limiter.Wait(ctx); err != nil {
 		return fmt.Errorf("rate limit exceeded: %w", err)
 	}
@@ -82,8 +84,24 @@ func (j *JupiterDEX) ExecuteOrder(ctx context.Context, order *Order) error {
 	}
 
 	// Execute swap
-	if err := j.ExecuteSwap(ctx, quote, order.Wallet); err != nil {
+	swapReq := &SwapRequest{
+		QuoteResponse: *quote,
+	}
+
+	body, err := json.Marshal(swapReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal swap request: %w", err)
+	}
+
+	resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
+	if err != nil {
 		return fmt.Errorf("failed to execute swap: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var swap SwapResponse
+	if err := json.NewDecoder(resp.Body).Decode(&swap); err != nil {
+		return fmt.Errorf("failed to decode swap response: %w", err)
 	}
 
 	return nil
@@ -106,7 +124,8 @@ func (j *JupiterDEX) ExecuteOrder(ctx context.Context, order *Order) error {
 	return nil
 }
 
-func (j *JupiterDEX) GetMarketPrice(ctx context.Context, token string) (float64, error) {
+func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
+	ctx := context.Background()
 	if err := j.limiter.Wait(ctx); err != nil {
 		return 0, fmt.Errorf("rate limit exceeded: %w", err)
 	}
