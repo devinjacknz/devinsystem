@@ -19,19 +19,6 @@ type Config struct {
 	DeepSeekURL  string `json:"deepseek_url"`
 }
 
-// Log markers for structured logging
-const (
-	LogMarkerSystem   = "[SYSTEM]"
-	LogMarkerTrade    = "[TRADE]"
-	LogMarkerMarket   = "[MARKET]"
-	LogMarkerAI       = "[AI]"
-	LogMarkerWallet   = "[WALLET]"
-	LogMarkerRisk     = "[RISK]"
-	LogMarkerPerf     = "[PERF]"
-	LogMarkerError    = "[ERROR]"
-	LogMarkerRetry    = "[RETRY]"
-)
-
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
