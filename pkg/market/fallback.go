@@ -15,23 +15,31 @@ type FallbackClient struct {
 	backoff   time.Duration
 }
 
+func (c *FallbackClient) ValidateConnection(ctx context.Context) error {
+	if err := c.primary.ValidateConnection(ctx); err != nil {
+		log.Printf("[ERROR] Primary RPC validation failed: %v", err)
+		return c.fallback.ValidateConnection(ctx)
+	}
+	return nil
+}
+
 func NewFallbackClient(endpoint string) *FallbackClient {
 	// Primary client with standard settings
 	primary := NewHeliusClient(endpoint)
-	primary.(*HeliusClient).httpClient.Timeout = 5 * time.Second
+	primary.(*HeliusClient).httpClient.Timeout = 10 * time.Second
 
 	// Fallback client with aggressive settings
-	fallbackClient := NewHeliusClient(endpoint)
+	fallbackClient := NewHeliusClient("https://eclipse.helius-rpc.com/")
 	if helius, ok := fallbackClient.(*HeliusClient); ok {
-		helius.httpClient.Timeout = 3 * time.Second
-		helius.limiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+		helius.httpClient.Timeout = 8 * time.Second
+		helius.limiter = rate.NewLimiter(rate.Every(1*time.Second), 2)
 	}
 
 	return &FallbackClient{
 		primary:  primary,
 		fallback: fallbackClient,
-		retries:  5,
-		backoff:  500 * time.Millisecond,
+		retries:  3,
+		backoff:  2 * time.Second,
 	}
 }
 

@@ -45,7 +45,12 @@ func main() {
 	log.SetOutput(f)
 
 	// Initialize components
+	log.Printf("%s Initializing market data client with primary RPC: %s", logging.LogMarkerSystem, os.Getenv("RPC_ENDPOINT"))
 	marketData := market.NewFallbackClient(os.Getenv("RPC_ENDPOINT"))
+	if err := marketData.ValidateConnection(ctx); err != nil {
+		log.Printf("%s Failed to validate RPC connection: %v, switching to backup RPC", logging.LogMarkerError, err)
+		marketData = market.NewFallbackClient("https://eclipse.helius-rpc.com/")
+	}
 	
 	// Initialize Ollama with DeepSeek R1 model
 	ollama := models.NewOllamaClient(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))

@@ -16,6 +16,7 @@ type Client interface {
 	GetMarketData(ctx context.Context, token string) (*MarketData, error)
 	GetTokenList(ctx context.Context) ([]string, error)
 	GetTopTokens(ctx context.Context) ([]Token, error)
+	ValidateConnection(ctx context.Context) error
 }
 
 type Token struct {
