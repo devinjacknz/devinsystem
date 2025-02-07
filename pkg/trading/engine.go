@@ -30,7 +30,7 @@ type Engine struct {
 }
 
 func NewEngine(marketData market.Client, ollama models.Client, riskMgr risk.Manager, tokenCache *utils.TokenCache) *Engine {
-	return &Engine{
+	engine := &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
@@ -39,6 +39,26 @@ func NewEngine(marketData market.Client, ollama models.Client, riskMgr risk.Mana
 		stopChan:  make(chan struct{}),
 		positions: make(map[string]float64),
 	}
+
+	// Initialize token cache with default tokens
+	defaultTokens := []string{
+		"So11111111111111111111111111111111111111112", // Wrapped SOL
+		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+	}
+
+	for _, token := range defaultTokens {
+		if info, err := marketData.GetMarketData(context.Background(), token); err == nil {
+			tokenCache.Set(token, &utils.TokenInfo{
+				Symbol:    token,
+				Price:     info.Price,
+				Volume:    info.Volume,
+				UpdatedAt: time.Now(),
+			})
+		}
+	}
+
+	return engine
 }
 
 func (e *Engine) Start(ctx context.Context) error {
@@ -176,6 +196,25 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 		log.Printf("%s Failed to get top tokens: %v", logging.LogMarkerError, err)
 		return fmt.Errorf("failed to get top tokens: %w", err)
 	}
+
+	if len(tokens) == 0 {
+		log.Printf("%s No tokens available for analysis, initializing defaults", logging.LogMarkerMarket)
+		defaultTokens := []string{
+			"So11111111111111111111111111111111111111112", // Wrapped SOL
+		}
+		for _, token := range defaultTokens {
+			if info, err := e.marketData.GetMarketData(ctx, token); err == nil {
+				e.tokenCache.Set(token, &utils.TokenInfo{
+					Symbol:    token,
+					Price:     info.Price,
+					Volume:    info.Volume,
+					UpdatedAt: time.Now(),
+				})
+			}
+		}
+		tokens, _ = e.tokenCache.GetTopTokens(ctx)
+	}
+
 	log.Printf("%s Retrieved %d tokens for analysis", logging.LogMarkerMarket, len(tokens))
 
 	for _, token := range tokens {
