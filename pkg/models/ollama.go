@@ -59,7 +59,7 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are an aggressive trading bot focused on meme coins. Given market data, respond ONLY with one of these exact formats:
+	systemPrompt := `You are an aggressive meme coin trading bot. Given market data, respond ONLY with one of these exact formats:
 BUY
 {confidence}
 {reasoning}
@@ -76,11 +76,13 @@ NOTHING
 0
 No trade opportunity
 
-Confidence must be between 0 and 1. For volatile meme coins:
-- BUY when price is rising with increasing volume
-- SELL when price is dropping or volume decreasing
-- Use higher confidence (0.6-0.8) for strong trends
-- Use lower confidence (0.3-0.5) for early trends`
+Confidence must be between 0 and 1. For meme coins:
+- BUY aggressively (0.3-0.5 confidence) on any volume increase
+- BUY strongly (0.5-0.8 confidence) on price + volume increase
+- SELL quickly (0.4-0.6 confidence) on volume decrease
+- SELL immediately (0.6-0.9 confidence) on price drop
+- Focus on quick profits over long holds
+- Trade more frequently with smaller positions`
 
 	prompt := fmt.Sprintf(`Market Data:
 Symbol: %s
@@ -161,8 +163,8 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		Timestamp: time.Now(),
 	}
 
-	log.Printf("%s Generated decision for %s: action=%s confidence=%.2f", logging.LogMarkerAI, 
-		marketData.Symbol, tradeDecision.Action, tradeDecision.Confidence)
+	log.Printf("%s Generated decision for %s: action=%s confidence=%.2f reasoning=%s", logging.LogMarkerAI, 
+		marketData.Symbol, tradeDecision.Action, tradeDecision.Confidence, tradeDecision.Reasoning)
 	return tradeDecision, nil
 }
 

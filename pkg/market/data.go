@@ -75,14 +75,14 @@ type tokenAccountBalance struct {
 
 func NewHeliusClient(rpcEndpoint string) Client {
 	if rpcEndpoint == "" {
-		rpcEndpoint = os.Getenv("RPC_ENDPOINT")
+		rpcEndpoint = "https://eclipse.helius-rpc.com/"  // Use Eclipse as primary
 	}
-	// Use Eclipse RPC as fallback
-	eclipseRPC := "https://eclipse.helius-rpc.com/"
+	// Use Helius as fallback
+	heliusRPC := os.Getenv("RPC_ENDPOINT")
 	
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
-		fallbackRPC: eclipseRPC,
+		fallbackRPC: heliusRPC,
 		httpClient:  &http.Client{
 			Timeout: 15 * time.Second,
 			Transport: &http.Transport{
@@ -326,12 +326,7 @@ func (c *HeliusClient) GetTokenList(ctx context.Context) ([]string, error) {
 	// Use a simpler approach for testing - return some test tokens
 	tokens := []string{
 		"So11111111111111111111111111111111111111112", // Wrapped SOL
-		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
 		"7i5KKsX2weiTkry7jA4ZwSuXGhs5eJBEjY8vVxR4mFNd", // BONK
-		"DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", // RAYDIUM
-		"4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", // RAY
-		"HxhWkVpk5NS4Ltg5nij2G671CKXFRKM8Vg4Qgn4eFDJG", // HADES
 		"7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", // SAMO
 	}
 	log.Printf("%s Retrieved %d tokens", logging.LogMarkerMarket, len(tokens))
