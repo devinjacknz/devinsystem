@@ -22,8 +22,13 @@ type OllamaClient struct {
 	model      string
 }
 
-func (c *OllamaClient) AnalyzeMarket(data market.MarketData) (*ai.Analysis, error) {
-	decision, err := c.GenerateTradeDecision(context.Background(), &data)
+func (c *OllamaClient) AnalyzeMarket(data ai.MarketData) (*ai.Analysis, error) {
+	marketData := market.MarketData{
+		Symbol:    data.Symbol,
+		Price:     data.Price,
+		Volume:    data.Volume,
+	}
+	decision, err := c.GenerateTradeDecision(context.Background(), &marketData)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +41,13 @@ func (c *OllamaClient) AnalyzeMarket(data market.MarketData) (*ai.Analysis, erro
 	}, nil
 }
 
-func (c *OllamaClient) AnalyzeRisk(data market.MarketData) (*ai.RiskAnalysis, error) {
-	decision, err := c.GenerateTradeDecision(context.Background(), &data)
+func (c *OllamaClient) AnalyzeRisk(data ai.MarketData) (*ai.RiskAnalysis, error) {
+	marketData := market.MarketData{
+		Symbol:    data.Symbol,
+		Price:     data.Price,
+		Volume:    data.Volume,
+	}
+	decision, err := c.GenerateTradeDecision(context.Background(), &marketData)
 	if err != nil {
 		return nil, err
 	}
