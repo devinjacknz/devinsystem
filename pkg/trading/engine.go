@@ -42,9 +42,9 @@ func NewEngine(marketData market.Client, ollama models.Client, riskMgr risk.Mana
 
 	// Initialize token cache with default tokens
 	defaultTokens := []string{
-		"SOL", // Native SOL
-		"USDC", // USDC
-		"USDT", // USDT
+		"So11111111111111111111111111111111111111112", // Wrapped SOL
+		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
 	}
 
 	for _, token := range defaultTokens {
@@ -218,8 +218,14 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 	log.Printf("%s Retrieved %d tokens for analysis", logging.LogMarkerMarket, len(tokens))
 
 	for _, token := range tokens {
-		data, err := e.marketData.GetMarketData(ctx, token.Symbol)
+		data, err := e.marketData.GetMarketData(ctx, token)
 		if err != nil {
+			log.Printf("%s Failed to get market data for %s: %v", logging.LogMarkerError, token, err)
+			continue
+		}
+
+		if data.Price <= 0 {
+			log.Printf("%s Invalid price for %s: %.8f", logging.LogMarkerError, token, data.Price)
 			continue
 		}
 
@@ -262,13 +268,26 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 
 func calculateTradeAmount(price float64, volume float64) float64 {
 	if price <= 0 {
+		log.Printf("%s Invalid price for trade amount calculation: %.8f", logging.LogMarkerError, price)
 		return 0
 	}
-	maxAmount := 100.0 // Max amount in USD for each trade
-	liquidityFactor := math.Min(1.0, volume/1000000.0) // Scale based on volume
-	amount := maxAmount * liquidityFactor / price
-	if math.IsInf(amount, 0) || math.IsNaN(amount) {
-		return 0
+
+	// Base amount in SOL (0.1 SOL)
+	baseAmount := 0.1
+	if volume <= 0 {
+		log.Printf("%s Invalid volume for trade amount calculation: %.2f", logging.LogMarkerError, volume)
+		return baseAmount
 	}
+
+	// Scale amount based on volume (max 1.0 SOL)
+	liquidityFactor := math.Min(1.0, volume/10000.0)
+	amount := baseAmount * (1 + liquidityFactor)
+
+	if amount <= 0 || math.IsInf(amount, 0) || math.IsNaN(amount) {
+		log.Printf("%s Invalid calculated amount: %.8f", logging.LogMarkerError, amount)
+		return baseAmount
+	}
+
+	log.Printf("%s Calculated trade amount: %.8f SOL (volume: %.2f)", logging.LogMarkerTrade, amount, volume)
 	return amount
 }
