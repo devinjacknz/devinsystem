@@ -3,6 +3,7 @@ package trading
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
