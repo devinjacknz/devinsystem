@@ -52,14 +52,18 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 	if !ok {
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading assistant. Analyze the market data and make a trading decision.
-Consider:
-1. Price trends
-2. Volume patterns
-3. Risk factors
+	systemPrompt := `You are a trading bot. Given market data, respond ONLY with one of these exact formats:
+BUY
+0.8
+Reasoning here
 
-Respond with one of: BUY, SELL, or NOTHING followed by your reasoning.
-Include a confidence score (0-100) in your analysis.`
+OR
+
+SELL
+0.7
+Reasoning here
+
+The number must be between 0 and 1 representing confidence.`
 
 	prompt := fmt.Sprintf(`Market Data:
 Symbol: %s
@@ -84,7 +88,7 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/chat", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/generate", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -134,8 +138,8 @@ func parseTradeDecision(content string) (string, float64, string) {
 	var reasoning string
 
 	for _, line := range lines[1:] {
-		if bytes.Contains(line, []byte("confidence")) {
-			fmt.Sscanf(string(line), "confidence: %f", &confidence)
+	if confidence == 0 && len(bytes.TrimSpace(line)) > 0 {
+			fmt.Sscanf(string(bytes.TrimSpace(line)), "%f", &confidence)
 		}
 	}
 
