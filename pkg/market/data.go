@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -55,7 +56,7 @@ func NewHeliusClient(rpcEndpoint string) *HeliusClient {
 	}
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
-		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		httpClient:  &http.Client{Timeout: 5 * time.Second},
 		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
 	}
 }
@@ -156,32 +157,57 @@ func (c *HeliusClient) getLargestTokenHolders(ctx context.Context, token string)
 }
 
 func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, response *rpcResponse) error {
+	log.Printf("[RPC] Making request: method=%s", request.Method)
+	
 	body, err := json.Marshal(request)
 	if err != nil {
+		log.Printf("[ERROR] Failed to marshal RPC request: %v", err)
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.rpcEndpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	for attempt := 1; attempt <= 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", c.rpcEndpoint, bytes.NewReader(body))
+		if err != nil {
+			log.Printf("[ERROR] Failed to create RPC request: %v", err)
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			log.Printf("[ERROR] Failed to send RPC request (attempt %d/3): %v", attempt, err)
+			if attempt < 3 {
+				time.Sleep(time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to send request: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf("[ERROR] RPC returned non-200 status: %d, body: %s", resp.StatusCode, string(body))
+			if attempt < 3 {
+				time.Sleep(time.Second)
+				continue
+			}
+			return fmt.Errorf("RPC returned status %d", resp.StatusCode)
+		}
 
-	if response.Error != nil {
-		return fmt.Errorf("RPC error: %s", response.Error.Message)
-	}
+		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+			log.Printf("[ERROR] Failed to decode RPC response: %v", err)
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
 
-	return nil
+		if response.Error != nil {
+			log.Printf("[ERROR] RPC error: %s", response.Error.Message)
+			return fmt.Errorf("RPC error: %s", response.Error.Message)
+		}
+
+		log.Printf("[RPC] Request successful: method=%s", request.Method)
+		return nil
+	}
+	return fmt.Errorf("all retry attempts failed")
 }
 
 func (c *HeliusClient) GetTopTokens(ctx context.Context) ([]Token, error) {
