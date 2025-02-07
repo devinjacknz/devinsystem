@@ -58,8 +58,9 @@ func NewHeliusClient(rpcEndpoint string) Client {
 	}
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
-		httpClient:  &http.Client{Timeout: 5 * time.Second},
+		httpClient:  &http.Client{Timeout: 3 * time.Second},
 		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
+		mu:          sync.RWMutex{},
 	}
 }
 
@@ -177,19 +178,22 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	for attempt := 1; attempt <= 3; attempt++ {
+	for attempt := 1; attempt <= 5; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, "POST", c.rpcEndpoint, bytes.NewReader(body))
 		if err != nil {
 			log.Printf("%s Failed to create RPC request: %v", logging.LogMarkerError, err)
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			log.Printf("%s Failed to send RPC request (attempt %d/3): %v", logging.LogMarkerError, attempt, err)
-			if attempt < 3 {
-				time.Sleep(time.Second)
+			log.Printf("%s Failed to send RPC request (attempt %d/5): %v", logging.LogMarkerError, attempt, err)
+			if attempt < 5 {
+				backoff := time.Duration(attempt) * 500 * time.Millisecond
+				log.Printf("%s Retrying in %v...", logging.LogMarkerRetry, backoff)
+				time.Sleep(backoff)
 				continue
 			}
 			return fmt.Errorf("failed to send request: %w", err)
@@ -199,8 +203,10 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			log.Printf("%s RPC returned non-200 status: %d, body: %s", logging.LogMarkerError, resp.StatusCode, string(body))
-			if attempt < 3 {
-				time.Sleep(time.Second)
+			if attempt < 5 {
+				backoff := time.Duration(attempt) * 500 * time.Millisecond
+				log.Printf("%s Retrying in %v...", logging.LogMarkerRetry, backoff)
+				time.Sleep(backoff)
 				continue
 			}
 			return fmt.Errorf("RPC returned status %d", resp.StatusCode)
