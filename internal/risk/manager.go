@@ -3,9 +3,12 @@ package risk
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/devinjacknz/devinsystem/internal/ai"
+	"github.com/devinjacknz/devinsystem/pkg/utils"
 )
 
 type Order struct {
@@ -60,27 +63,38 @@ func NewRiskManager(aiService ai.Service, maxExposure float64) *RiskManager {
 }
 
 func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
+	start := time.Now()
+	defer func() {
+		log.Printf("%s Risk validation took %v", utils.LogMarkerPerf, time.Since(start))
+	}()
+
+	log.Printf("%s Validating trade: %+v", utils.LogMarkerRisk, trade)
+
 	// Check AI risk analysis
 	riskAnalysis, err := rm.aiService.AnalyzeRisk(ai.MarketData{
 		Symbol: trade.Token,
 		Price:  trade.Price,
 	})
 	if err != nil {
+		log.Printf("%s Failed to analyze risk: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to analyze risk: %w", err)
 	}
 
 	// Set stop loss based on AI recommendation
 	if err := rm.stopLoss.SetStopLoss(trade.Token, riskAnalysis.StopLossPrice); err != nil {
+		log.Printf("%s Failed to set stop loss: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to set stop loss: %w", err)
 	}
 
 	// Check exposure
 	exposure, err := rm.CheckExposure(trade.Token)
 	if err != nil {
+		log.Printf("%s Failed to check exposure: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to check exposure: %w", err)
 	}
 
 	if exposure+trade.Amount > rm.maxExposure {
+		log.Printf("%s Trade would exceed maximum exposure of %.2f", utils.LogMarkerRisk, rm.maxExposure)
 		return fmt.Errorf("trade would exceed maximum exposure")
 	}
 
