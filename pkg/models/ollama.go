@@ -59,31 +59,28 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are an aggressive meme coin trading bot. Given market data, respond ONLY with one of these exact formats:
+	systemPrompt := `You are a trading bot. Analyze market data and output EXACTLY in this format:
+
+For buys:
 BUY
-{confidence}
-{reasoning}
+0.6
+Price increase detected with volume support
 
-OR
-
+For sells:
 SELL
-{confidence}
-{reasoning}
+0.7
+Price dropping with increasing volume
 
-OR
-
+For no action:
 NOTHING
 0.1
-Market conditions unfavorable
+Insufficient market activity
 
-Confidence must be between 0.1 and 0.9. For meme coins:
-- BUY aggressively (0.4-0.6 confidence) on volume spikes >10%
-- BUY strongly (0.6-0.8 confidence) on price increase >2% with volume
-- SELL quickly (0.5-0.7 confidence) on volume drop >5%
-- SELL immediately (0.7-0.9 confidence) on price drop >1%
-- Use 0.1-0.3 confidence for NOTHING decisions
-- Focus on momentum and quick profits
-- Look for scalping opportunities in volatile markets`
+Rules:
+1. First line must be BUY, SELL, or NOTHING
+2. Second line must be confidence (0.1-0.9)
+3. Third line must be reasoning
+4. No other format is allowed`
 
 	prompt := fmt.Sprintf(`Analyze this real-time market data and make an aggressive trading decision:
 Token: %s
@@ -180,49 +177,67 @@ Consider:
 
 func parseTradeDecision(content string) (string, float64, string) {
 	lines := bytes.Split([]byte(content), []byte("\n"))
-	if len(lines) == 0 {
-		return "NOTHING", 0.1, "No valid market data available for decision"
+	if len(lines) < 3 {
+		return "NOTHING", 0.1, "Insufficient response data"
 	}
 
-	decision := string(bytes.TrimSpace(lines[0]))
+	// Get decision from first non-empty line
+	var decision string
+	for _, line := range lines {
+		if trimmed := string(bytes.TrimSpace(line)); trimmed != "" {
+			decision = trimmed
+			break
+		}
+	}
+
 	switch decision {
 	case "BUY", "SELL":
 		// Valid trading decision
 	case "NOTHING":
-		return "NOTHING", 0.1, "Market conditions unfavorable for trading"
+		return "NOTHING", 0.1, "Market conditions unfavorable"
 	default:
-		return "NOTHING", 0.1, "Invalid decision format received"
+		return "NOTHING", 0.1, "Market analysis inconclusive"
 	}
 
+	// Find confidence value (first number between 0.1 and 0.9)
 	var confidence float64
-	var reasoning string
-
-	// Parse confidence from second line
-	if len(lines) > 1 {
-		confStr := string(bytes.TrimSpace(lines[1]))
-		if _, err := fmt.Sscanf(confStr, "%f", &confidence); err != nil || confidence == 0 {
-			confidence = 0.3 // Default to minimum trading confidence
+	for _, line := range lines {
+		trimmed := string(bytes.TrimSpace(line))
+		if _, err := fmt.Sscanf(trimmed, "%f", &confidence); err == nil {
+			if confidence >= 0.1 && confidence <= 0.9 {
+				break
+			}
 		}
 	}
 
-	// Ensure confidence is within valid range
-	switch {
-	case confidence < 0.1:
-		confidence = 0.1
-	case confidence > 0.9:
-		confidence = 0.9
+	if confidence < 0.1 {
+		confidence = 0.3 // Default trading confidence
 	}
 
-	// Extract reasoning from remaining lines
-	if len(lines) > 2 {
-		reasoningLines := lines[2:]
-		reasoning = string(bytes.TrimSpace(bytes.Join(reasoningLines, []byte("\n"))))
-		if reasoning == "" {
-			reasoning = "Market analysis complete, confidence level indicates potential opportunity"
+	// Extract reasoning (all non-empty lines after decision and confidence)
+	var reasoningLines []string
+	foundConfidence := false
+	for _, line := range lines {
+		trimmed := string(bytes.TrimSpace(line))
+		if trimmed == "" || trimmed == decision {
+			continue
 		}
-	} else {
-		reasoning = "Decision based on current market conditions"
+		
+		var testConf float64
+		if _, err := fmt.Sscanf(trimmed, "%f", &testConf); err == nil {
+			foundConfidence = true
+			continue
+		}
+		
+		if foundConfidence && trimmed != "" {
+			reasoningLines = append(reasoningLines, trimmed)
+		}
 	}
 
+	reasoning := strings.Join(reasoningLines, " ")
+	if reasoning == "" {
+		reasoning = "Analysis based on current market conditions"
+	}
+	
 	return decision, confidence, reasoning
 }
