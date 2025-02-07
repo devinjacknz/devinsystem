@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/pkg/logging"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 )
 
@@ -48,8 +50,13 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 }
 
 func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface{}) (*TradeDecision, error) {
+	start := time.Now()
+	defer func() {
+		log.Printf("%s AI decision generation took %v", logging.LogMarkerPerf, time.Since(start))
+	}()
 	marketData, ok := data.(*market.MarketData)
 	if !ok {
+		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
 	systemPrompt := `You are a trading bot. Given market data, respond ONLY with one of these exact formats:
@@ -83,8 +90,10 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		},
 	}
 
+	log.Printf("%s Generating trade decision for %s using %s model", logging.LogMarkerAI, marketData.Symbol, c.model)
 	body, err := json.Marshal(request)
 	if err != nil {
+		log.Printf("%s Failed to marshal Ollama request: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
@@ -101,11 +110,13 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("%s Ollama API returned non-200 status: %d", logging.LogMarkerError, resp.StatusCode)
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var response ollamaResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		log.Printf("%s Failed to decode Ollama response: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -118,6 +129,8 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		Timestamp: time.Now(),
 	}
 
+	log.Printf("%s Generated decision for %s: action=%s confidence=%.2f", logging.LogMarkerAI, 
+		marketData.Symbol, tradeDecision.Action, tradeDecision.Confidence)
 	return tradeDecision, nil
 }
 
