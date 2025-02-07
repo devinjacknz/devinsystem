@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -88,9 +89,10 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		return fmt.Errorf("failed to get quote: %w", err)
 	}
 
-	// Execute swap
+	// Execute swap with wallet
 	swapReq := &SwapRequest{
-		QuoteResponse: *quote,
+		QuoteResponse:  *quote,
+		UserPublicKey: os.Getenv("WALLET"),
 	}
 
 	body, err := json.Marshal(swapReq)
