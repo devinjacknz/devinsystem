@@ -83,18 +83,25 @@ Rules:
 3. Third line must be reasoning
 4. No other format is allowed`
 
-	prompt := fmt.Sprintf(`Analyze this real-time market data and make an aggressive trading decision:
+	prompt := fmt.Sprintf(`Analyze this market data and output a trading decision:
 Token: %s
-Current Price: %.8f SOL
-24h Volume: %.2f SOL
-Last Update: %s
+Price: %.8f SOL
+Volume: %.2f SOL
+Time: %s
 
-Consider:
-- Volume spikes indicate potential momentum
-- Price movements >2%% warrant action
-- Look for quick scalping opportunities
-- Be aggressive with meme tokens
-- Use tight stop losses`, 
+Example valid responses:
+
+BUY
+0.6
+Strong volume increase detected with upward price movement
+
+SELL
+0.7
+Price dropping with high volume, indicating selling pressure
+
+NOTHING
+0.1
+No clear trading signals at current price level`, 
 		marketData.Symbol, marketData.Price, marketData.Volume, 
 		marketData.Timestamp.Format(time.RFC3339))
 
@@ -106,7 +113,7 @@ Consider:
 		},
 		Stream: false,
 		Options: Options{
-			Temperature: 0.7,
+			Temperature: 0.2, // Lower temperature for more consistent responses
 		},
 	}
 
@@ -162,7 +169,15 @@ Consider:
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	decision, confidence, reasoning := parseTradeDecision(response.Message.Content)
+	// Log raw response for debugging
+	log.Printf("%s Raw model response:\n%s", logging.LogMarkerAI, response.Message.Content)
+
+	// Clean up response by removing any markdown formatting
+	cleanContent := strings.ReplaceAll(response.Message.Content, "```", "")
+	cleanContent = strings.TrimSpace(cleanContent)
+
+	// Parse the cleaned response
+	decision, confidence, reasoning := parseTradeDecision(cleanContent)
 	tradeDecision := &TradeDecision{
 		Action:     decision,
 		Confidence: confidence,
