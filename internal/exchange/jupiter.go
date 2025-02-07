@@ -27,7 +27,7 @@ type QuoteResponse struct {
 	OutputMint string `json:"outputMint"`
 	InAmount   string `json:"inAmount"`
 	OutAmount  string `json:"outAmount"`
-	Price      string `json:"price"`
+	Price      float64 `json:"price"`
 }
 
 type SwapRequest struct {
@@ -104,8 +104,8 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 	}
 	defer resp.Body.Close()
 
-	var swap SwapResponse
-	if err := json.NewDecoder(resp.Body).Decode(&swap); err != nil {
+	var swapResult SwapResponse
+	if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
 		return fmt.Errorf("failed to decode swap response: %w", err)
 	}
 

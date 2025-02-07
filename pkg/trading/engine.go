@@ -78,7 +78,7 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 	}
 
 	// Create trade with risk validation
-	trade := &Trade{
+	trade := &risk.Trade{
 		Token:     token,
 		Amount:    amount,
 		Direction: decision.Action,

@@ -38,7 +38,7 @@ type RiskManager struct {
 	maxExposure float64
 }
 
-func NewManager() Manager {
+func NewManager() *RiskManager {
 	return &RiskManager{
 		stopLoss:    NewStopLoss(),
 		slippage:    NewSlippageProtection(50),
