@@ -73,22 +73,32 @@ SELL
 OR
 
 NOTHING
-0
-No trade opportunity
+0.1
+Market conditions unfavorable
 
-Confidence must be between 0 and 1. For meme coins:
-- BUY aggressively (0.3-0.5 confidence) on any volume increase
-- BUY strongly (0.5-0.8 confidence) on price + volume increase
-- SELL quickly (0.4-0.6 confidence) on volume decrease
-- SELL immediately (0.6-0.9 confidence) on price drop
-- Focus on quick profits over long holds
-- Trade more frequently with smaller positions`
+Confidence must be between 0.1 and 0.9. For meme coins:
+- BUY aggressively (0.4-0.6 confidence) on volume spikes >10%
+- BUY strongly (0.6-0.8 confidence) on price increase >2% with volume
+- SELL quickly (0.5-0.7 confidence) on volume drop >5%
+- SELL immediately (0.7-0.9 confidence) on price drop >1%
+- Use 0.1-0.3 confidence for NOTHING decisions
+- Focus on momentum and quick profits
+- Look for scalping opportunities in volatile markets`
 
-	prompt := fmt.Sprintf(`Market Data:
-Symbol: %s
-Price: %.8f
-Volume: %.2f
-Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketData.Timestamp.Format(time.RFC3339))
+	prompt := fmt.Sprintf(`Analyze this real-time market data and make an aggressive trading decision:
+Token: %s
+Current Price: %.8f SOL
+24h Volume: %.2f SOL
+Last Update: %s
+
+Consider:
+- Volume spikes indicate potential momentum
+- Price movements >2%% warrant action
+- Look for quick scalping opportunities
+- Be aggressive with meme tokens
+- Use tight stop losses`, 
+		marketData.Symbol, marketData.Price, marketData.Volume, 
+		marketData.Timestamp.Format(time.RFC3339))
 
 	request := ollamaRequest{
 		Model: c.model,
@@ -171,27 +181,47 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 func parseTradeDecision(content string) (string, float64, string) {
 	lines := bytes.Split([]byte(content), []byte("\n"))
 	if len(lines) == 0 {
-		return "NOTHING", 0, "No decision could be parsed"
+		return "NOTHING", 0.1, "No valid market data available for decision"
 	}
 
 	decision := string(bytes.TrimSpace(lines[0]))
 	switch decision {
-	case "BUY", "SELL", "NOTHING":
+	case "BUY", "SELL":
+		// Valid trading decision
+	case "NOTHING":
+		return "NOTHING", 0.1, "Market conditions unfavorable for trading"
 	default:
-		decision = "NOTHING"
+		return "NOTHING", 0.1, "Invalid decision format received"
 	}
 
 	var confidence float64
 	var reasoning string
 
-	for _, line := range lines[1:] {
-	if confidence == 0 && len(bytes.TrimSpace(line)) > 0 {
-			fmt.Sscanf(string(bytes.TrimSpace(line)), "%f", &confidence)
+	// Parse confidence from second line
+	if len(lines) > 1 {
+		confStr := string(bytes.TrimSpace(lines[1]))
+		if _, err := fmt.Sscanf(confStr, "%f", &confidence); err != nil || confidence == 0 {
+			confidence = 0.3 // Default to minimum trading confidence
 		}
 	}
 
-	if len(lines) > 1 {
-		reasoning = string(bytes.Join(lines[1:], []byte("\n")))
+	// Ensure confidence is within valid range
+	switch {
+	case confidence < 0.1:
+		confidence = 0.1
+	case confidence > 0.9:
+		confidence = 0.9
+	}
+
+	// Extract reasoning from remaining lines
+	if len(lines) > 2 {
+		reasoningLines := lines[2:]
+		reasoning = string(bytes.TrimSpace(bytes.Join(reasoningLines, []byte("\n"))))
+		if reasoning == "" {
+			reasoning = "Market analysis complete, confidence level indicates potential opportunity"
+		}
+	} else {
+		reasoning = "Decision based on current market conditions"
 	}
 
 	return decision, confidence, reasoning
