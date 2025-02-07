@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -128,7 +129,7 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 }
 
 func (e *Engine) monitorMarkets(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(2 * time.Second) // Respect RPC rate limits
 	defer ticker.Stop()
 
 	for {
@@ -163,8 +164,8 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 			continue
 		}
 
-		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.1 {
-			amount := calculateTradeAmount(data.Price)
+		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.25 {
+			amount := calculateTradeAmount(data.Price, data.Volume)
 			if decision.Action == "SELL" {
 				if position, exists := e.positions[token.Symbol]; exists && position > 0 {
 					amount = position
@@ -194,7 +195,8 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 	return nil
 }
 
-func calculateTradeAmount(price float64) float64 {
+func calculateTradeAmount(price float64, volume float64) float64 {
 	maxAmount := 100.0 // Max amount in USD for each trade
-	return maxAmount / price
+	liquidityFactor := math.Min(1.0, volume/1000000.0) // Scale based on volume
+	return maxAmount * liquidityFactor / price
 }
