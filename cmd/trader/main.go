@@ -56,7 +56,7 @@ func main() {
 	ollama := models.NewOllamaClient(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
 
 	// Initialize risk manager with 3M max exposure for meme coins
-	riskMgr := risk.NewRiskManager(nil, 3_000_000)
+	riskMgr := risk.NewRiskManager(ollama, 3_000_000)
 
 	// Initialize token cache with test tokens
 	tokenCache := utils.NewTokenCache(time.Hour, 30, func(ctx context.Context, token string) (*utils.TokenInfo, error) {

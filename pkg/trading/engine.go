@@ -222,7 +222,14 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 }
 
 func calculateTradeAmount(price float64, volume float64) float64 {
+	if price <= 0 {
+		return 0
+	}
 	maxAmount := 100.0 // Max amount in USD for each trade
 	liquidityFactor := math.Min(1.0, volume/1000000.0) // Scale based on volume
-	return maxAmount * liquidityFactor / price
+	amount := maxAmount * liquidityFactor / price
+	if math.IsInf(amount, 0) || math.IsNaN(amount) {
+		return 0
+	}
+	return amount
 }
