@@ -6,6 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/internal/exchange"
+	"github.com/devinjacknz/devinsystem/internal/risk"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
@@ -17,7 +20,6 @@ type Engine struct {
 	ollama      models.Client
 	riskMgr     *RiskManager
 	tokenCache  *utils.TokenCache
-	mongoRepo   *mongo.Repository
 	wallet      wallet.Manager
 	jupiter     *exchange.JupiterDEX
 	isRunning   bool
@@ -25,13 +27,12 @@ type Engine struct {
 	positions   map[string]float64
 }
 
-func NewEngine(marketData market.Client, ollama models.Client, riskMgr *RiskManager, tokenCache *utils.TokenCache, mongoRepo *mongo.Repository, walletMgr wallet.Manager) *Engine {
+func NewEngine(marketData market.Client, ollama models.Client, riskMgr *risk.Manager, tokenCache *utils.TokenCache, walletMgr wallet.Manager) *Engine {
 	return &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
 		tokenCache: tokenCache,
-		mongoRepo:  mongoRepo,
 		wallet:     walletMgr,
 		jupiter:    exchange.NewJupiterDEX(),
 		stopChan:  make(chan struct{}),
@@ -148,7 +149,7 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 			continue
 		}
 
-		decision, err := e.ollama.GenerateTradeDecision(ctx, data, e.mongoRepo)
+		decision, err := e.ollama.GenerateTradeDecision(ctx, data)
 		if err != nil {
 			continue
 		}
