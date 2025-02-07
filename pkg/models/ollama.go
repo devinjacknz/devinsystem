@@ -90,6 +90,28 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		},
 	}
 
+	// Try to load model first
+	loadBody, err := json.Marshal(map[string]string{"name": c.model})
+	if err != nil {
+		log.Printf("%s Failed to marshal model load request: %v", logging.LogMarkerError, err)
+		return nil, err
+	}
+
+	loadReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/pull", bytes.NewReader(loadBody))
+	if err != nil {
+		log.Printf("%s Failed to create model load request: %v", logging.LogMarkerError, err)
+		return nil, err
+	}
+	loadReq.Header.Set("Content-Type", "application/json")
+
+	log.Printf("%s Loading model %s...", logging.LogMarkerAI, c.model)
+	resp, err := c.httpClient.Do(loadReq)
+	if err != nil {
+		log.Printf("%s Failed to load model: %v", logging.LogMarkerError, err)
+		return nil, err
+	}
+	resp.Body.Close()
+
 	log.Printf("%s Generating trade decision for %s using %s model", logging.LogMarkerAI, marketData.Symbol, c.model)
 	body, err := json.Marshal(request)
 	if err != nil {
