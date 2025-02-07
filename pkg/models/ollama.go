@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -63,25 +64,25 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading bot. Analyze market data and respond with EXACTLY 3 lines:
-Line 1: BUY, SELL, or NOTHING
-Line 2: A confidence number between 0.1 and 0.9
-Line 3: A brief reason for the decision
+	systemPrompt := `You are a trading bot. Output EXACTLY 3 lines in this format:
 
-Example 1:
 BUY
 0.6
-Price trending up with volume support
+Volume spike detected
 
-Example 2:
+OR
+
 SELL
 0.7
-Price dropping with high volume
+Price dropping
 
-Example 3:
+OR
+
 NOTHING
 0.1
-No clear trading signals`
+No signals
+
+No other text allowed. Only these 3 lines.`
 
 	prompt := fmt.Sprintf(`Based on this market data, output EXACTLY 3 lines in this format:
 Line 1: BUY or SELL or NOTHING
@@ -112,7 +113,11 @@ Time: %s`,
 	}
 
 	// Try to load model first
-	loadBody, err := json.Marshal(map[string]string{"name": c.model})
+	loadBody, err := json.Marshal(map[string]interface{}{
+		"name":    c.model,
+		"stream":  false,
+		"timeout": 30000, // 30 seconds
+	})
 	if err != nil {
 		log.Printf("%s Failed to marshal model load request: %v", logging.LogMarkerError, err)
 		return nil, err
@@ -133,18 +138,13 @@ Time: %s`,
 	}
 	defer loadResp.Body.Close()
 
-	// Verify model loaded successfully
-	var loadResult struct {
-		Status string `json:"status"`
-	}
-	if err := json.NewDecoder(loadResp.Body).Decode(&loadResult); err != nil {
-		log.Printf("%s Failed to decode model load response: %v", logging.LogMarkerError, err)
+	// Read response body for debugging
+	respBody, err := io.ReadAll(loadResp.Body)
+	if err != nil {
+		log.Printf("%s Failed to read model load response: %v", logging.LogMarkerError, err)
 		return nil, err
 	}
-	if loadResult.Status != "success" {
-		log.Printf("%s Model load failed with status: %s", logging.LogMarkerError, loadResult.Status)
-		return nil, fmt.Errorf("model load failed: %s", loadResult.Status)
-	}
+	log.Printf("%s Model load response: %s", logging.LogMarkerAI, string(respBody))
 
 	log.Printf("%s Generating trade decision for %s using %s model", logging.LogMarkerAI, marketData.Symbol, c.model)
 	body, err := json.Marshal(request)
