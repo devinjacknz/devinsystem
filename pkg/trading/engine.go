@@ -14,7 +14,6 @@ import (
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
-	"github.com/devinjacknz/devinsystem/pkg/utils/config"
 )
 
 type Engine struct {
