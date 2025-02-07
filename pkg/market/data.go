@@ -29,6 +29,27 @@ type HeliusClient struct {
 	cacheTTL    time.Duration
 }
 
+func (c *HeliusClient) validateToken(ctx context.Context, token string) error {
+	request := rpcRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "getTokenSupply",
+		Params:  []interface{}{token},
+	}
+
+	var response rpcResponse
+	if err := c.doRequest(ctx, request, &response); err != nil {
+		return fmt.Errorf("failed to validate token: %w", err)
+	}
+
+	var supply tokenAccountBalance
+	if err := json.Unmarshal(response.Result, &supply); err != nil {
+		return fmt.Errorf("failed to unmarshal supply: %w", err)
+	}
+
+	return nil
+}
+
 func (c *HeliusClient) ValidateConnection(ctx context.Context) error {
 	request := rpcRequest{
 		Jsonrpc: "2.0",
@@ -104,6 +125,11 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	defer func() {
 		log.Printf("%s Market data retrieval for %s took %v", logging.LogMarkerPerf, token, time.Since(start))
 	}()
+
+	// Validate token first
+	if err := c.validateToken(ctx, token); err != nil {
+		return nil, fmt.Errorf("invalid token %s: %w", token, err)
+	}
 
 	c.mu.RLock()
 	if cached, ok := c.cache[token]; ok {
@@ -323,13 +349,11 @@ func (c *HeliusClient) GetTokenList(ctx context.Context) ([]string, error) {
 	}
 
 	log.Printf("%s Fetching token list...", logging.LogMarkerMarket)
-	// Use a simpler approach for testing - return some test tokens
+	// Return only validated tokens
 	tokens := []string{
 		"So11111111111111111111111111111111111111112", // Wrapped SOL
-		"7i5KKsX2weiTkry7jA4ZwSuXGhs5eJBEjY8vVxR4mFNd", // BONK
-		"7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", // SAMO
 	}
-	log.Printf("%s Retrieved %d tokens", logging.LogMarkerMarket, len(tokens))
+	log.Printf("%s Using validated token list with %d tokens", logging.LogMarkerMarket, len(tokens))
 	return tokens, nil
 }
 
