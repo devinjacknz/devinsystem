@@ -231,14 +231,14 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 
 		decision, err := e.ollama.GenerateTradeDecision(ctx, data)
 		if err != nil {
-			log.Printf("%s Failed to generate decision for %s: %v", logging.LogMarkerError, token.Symbol, err)
+			log.Printf("%s Failed to generate decision for %s: %v", logging.LogMarkerError, token, err)
 			continue
 		}
 
 		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.15 {
 			amount := calculateTradeAmount(data.Price, data.Volume)
 			if decision.Action == "SELL" {
-				if position, exists := e.positions[token.Symbol]; exists && position > 0 {
+				if position, exists := e.positions[token]; exists && position > 0 {
 					amount = position
 				} else {
 					continue
@@ -247,19 +247,19 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 
 			var executed bool
 			for attempt := 1; attempt <= 3; attempt++ {
-				log.Printf("%s Attempting trade %d/3 for %s %s", logging.LogMarkerRetry, attempt, decision.Action, token.Symbol)
-				if err := e.ExecuteTrade(ctx, token.Symbol, amount); err != nil {
+				log.Printf("%s Attempting trade %d/3 for %s %s", logging.LogMarkerRetry, attempt, decision.Action, token)
+				if err := e.ExecuteTrade(ctx, token, amount); err != nil {
 					log.Printf("%s Trade attempt %d failed: %v", logging.LogMarkerRetry, attempt, err)
 					time.Sleep(time.Second)
 					continue
 				}
 				log.Printf("%s Successfully executed %s order for %s, amount: %.4f, confidence: %.2f", logging.LogMarkerTrade, 
-					decision.Action, token.Symbol, amount, decision.Confidence)
+					decision.Action, token, amount, decision.Confidence)
 				executed = true
 				break
 			}
 			if !executed {
-				log.Printf("%s All retry attempts failed for %s %s", logging.LogMarkerError, decision.Action, token.Symbol)
+				log.Printf("%s All retry attempts failed for %s %s", logging.LogMarkerError, decision.Action, token)
 			}
 		}
 	}
