@@ -89,6 +89,8 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		Volume:    volume,
 		Timestamp: timestamp,
 	}
+	log.Printf("[MARKET] Retrieved data for %s: Price=%.8f Volume=%.2f Time=%s",
+		token, price, volume, timestamp.Format(time.RFC3339))
 
 	// Save market data
 	if err := c.SaveMarketData(ctx, data); err != nil {
