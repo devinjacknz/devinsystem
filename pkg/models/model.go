@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"time"
 )
 
 type Model interface {
@@ -11,9 +12,11 @@ type Model interface {
 }
 
 type TradeDecision struct {
-	Action     string  `json:"action"`      // BUY, SELL, or NOTHING
-	Confidence float64 `json:"confidence"`  // 0.0 to 1.0
-	Reasoning  string  `json:"reasoning"`   // Explanation for the decision
+	Action     string    `json:"action"`      // BUY, SELL, or NOTHING
+	Confidence float64   `json:"confidence"`  // 0.0 to 1.0
+	Reasoning  string    `json:"reasoning"`   // Explanation for the decision
+	Model      string    `json:"model"`       // Model used for decision
+	Timestamp  time.Time `json:"timestamp"`   // Time of decision
 }
 
 type BaseModel struct {

@@ -51,13 +51,18 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	req := &QuoteRequest{
+	reqBody := &QuoteRequest{
 		InputMint:  inputMint,
 		OutputMint: outputMint,
 		Amount:     amount,
 	}
 
-	resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", nil)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal quote request: %w", err)
+	}
+
+	resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quote: %w", err)
 	}
