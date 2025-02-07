@@ -41,9 +41,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		Jsonrpc: "2.0",
 		ID:      1,
 		Method:  "getTokenSupply",
-		Params:  []interface{}{GetTokenAddress(token), map[string]interface{}{
-			"commitment": "finalized",
-		}},
+		Params:  []interface{}{token},
 	}
 
 	var response rpcResponse
@@ -51,27 +49,27 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		return nil, fmt.Errorf("failed to get token supply: %w", err)
 	}
 
-	var price float64
-	if token == "So11111111111111111111111111111111111111112" {
-		var balance uint64
-		if err := json.Unmarshal(response.Result, &balance); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
-		}
-		price = float64(balance) / 1000000000 // Convert lamports to SOL
-		if price <= 0 {
-			log.Printf("%s Invalid SOL price from balance: %.8f", logging.LogMarkerError, price)
+	var supply struct {
+		Context struct {
+			Slot uint64 `json:"slot"`
+		} `json:"context"`
+		Value struct {
+			Amount   string `json:"amount"`
+			Decimals int    `json:"decimals"`
+			UIAmount float64 `json:"uiAmount"`
+		} `json:"value"`
+	}
+
+	if err := json.Unmarshal(response.Result, &supply); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal supply: %w", err)
+	}
+
+	price = supply.Value.UIAmount
+	if price <= 0 {
+		log.Printf("%s Invalid price for %s: %.8f", logging.LogMarkerError, token, price)
+		if token == "So11111111111111111111111111111111111111112" {
 			price = 100.0 // Default SOL price in USD
 		}
-	} else {
-		var supply tokenAccountBalance
-		if err := json.Unmarshal(response.Result, &supply); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal supply: %w", err)
-		}
-		amount, err := parseAmount(supply.Value.Amount)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse amount: %w", err)
-		}
-		price = float64(amount) / math.Pow10(supply.Value.Decimals)
 	}
 
 	holders, err := c.getLargestTokenHolders(ctx, token)
