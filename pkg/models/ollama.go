@@ -59,18 +59,28 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading bot. Given market data, respond ONLY with one of these exact formats:
+	systemPrompt := `You are an aggressive trading bot focused on meme coins. Given market data, respond ONLY with one of these exact formats:
 BUY
-0.8
-Reasoning here
+{confidence}
+{reasoning}
 
 OR
 
 SELL
-0.7
-Reasoning here
+{confidence}
+{reasoning}
 
-The number must be between 0 and 1 representing confidence.`
+OR
+
+NOTHING
+0
+No trade opportunity
+
+Confidence must be between 0 and 1. For volatile meme coins:
+- BUY when price is rising with increasing volume
+- SELL when price is dropping or volume decreasing
+- Use higher confidence (0.6-0.8) for strong trends
+- Use lower confidence (0.3-0.5) for early trends`
 
 	prompt := fmt.Sprintf(`Market Data:
 Symbol: %s

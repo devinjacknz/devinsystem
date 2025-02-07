@@ -190,7 +190,7 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 			continue
 		}
 
-		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.25 {
+		if (decision.Action == "BUY" || decision.Action == "SELL") && decision.Confidence > 0.15 {
 			amount := calculateTradeAmount(data.Price, data.Volume)
 			if decision.Action == "SELL" {
 				if position, exists := e.positions[token.Symbol]; exists && position > 0 {
