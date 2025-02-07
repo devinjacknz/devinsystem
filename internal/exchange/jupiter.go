@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/pkg/utils"
 	"golang.org/x/time/rate"
 )
 
@@ -59,10 +60,10 @@ func NewJupiterDEX() *JupiterDEX {
 }
 
 func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string, amount string) (*QuoteResponse, error) {
-	log.Printf("[JUPITER] Requesting quote: input=%s output=%s amount=%s", inputMint, outputMint, amount)
+	log.Printf("%s Requesting quote: input=%s output=%s amount=%s", utils.LogMarkerTrade, inputMint, outputMint, amount)
 
 	if err := j.limiter.Wait(ctx); err != nil {
-		log.Printf("[JUPITER] Rate limit exceeded for quote request: %v", err)
+		log.Printf("%s Rate limit exceeded for quote request: %v", utils.LogMarkerError, err)
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
@@ -77,11 +78,11 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		log.Printf("[JUPITER] Failed to marshal quote request: %v", err)
+		log.Printf("%s Failed to marshal quote request: %v", utils.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to marshal quote request: %w", err)
 	}
 
-	log.Printf("[JUPITER] Starting quote request with wallet: %s", os.Getenv("WALLET"))
+	log.Printf("%s Starting quote request with wallet: %s", utils.LogMarkerWallet, os.Getenv("WALLET"))
 
 		resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", bytes.NewReader(body))
 		if err != nil {
@@ -90,7 +91,7 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}
-			log.Printf("[JUPITER] Quote attempt %d/%d failed: %v, retrying in %v", 
+			log.Printf("%s Quote attempt %d/%d failed: %v, retrying in %v", utils.LogMarkerRetry, 
 				attempt, retryAttempts, err, backoff)
 			time.Sleep(backoff)
 			continue
@@ -109,20 +110,25 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 			continue
 		}
 
-		log.Printf("[JUPITER] Quote successful on attempt %d/%d", attempt, retryAttempts)
+		log.Printf("%s Quote successful on attempt %d/%d", utils.LogMarkerTrade, attempt, retryAttempts)
 		return &quote, nil
 	}
 	
-	log.Printf("[JUPITER] All quote attempts failed: %v", lastErr)
+	log.Printf("%s All quote attempts failed: %v", utils.LogMarkerError, lastErr)
 	return nil, fmt.Errorf("failed to get quote after %d attempts: %w", retryAttempts, lastErr)
 }
 
 func (j *JupiterDEX) ExecuteOrder(order Order) error {
+	start := time.Now()
 	ctx := context.Background()
-	log.Printf("[JUPITER] Starting order execution: %+v", order)
+	log.Printf("%s Starting order execution: %+v", utils.LogMarkerTrade, order)
+	
+	defer func() {
+		log.Printf("%s Order execution took %v", utils.LogMarkerPerf, time.Since(start))
+	}()
 
 	if err := j.limiter.Wait(ctx); err != nil {
-		log.Printf("[JUPITER] Rate limit exceeded: %v", err)
+		log.Printf("%s Rate limit exceeded: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
@@ -139,7 +145,7 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 
 	body, err := json.Marshal(swapReq)
 	if err != nil {
-		log.Printf("[JUPITER] Failed to marshal swap request: %v", err)
+		log.Printf("%s Failed to marshal swap request: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to marshal swap request: %w", err)
 	}
 
@@ -152,7 +158,7 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}
-			log.Printf("[JUPITER] Swap attempt %d/%d failed: %v, retrying in %v", 
+			log.Printf("%s Swap attempt %d/%d failed: %v, retrying in %v", utils.LogMarkerRetry, 
 				attempt, retryAttempts, err, backoff)
 			time.Sleep(backoff)
 			continue
@@ -173,11 +179,11 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 			continue
 		}
 
-		log.Printf("[JUPITER] Swap executed successfully: txHash=%s", result.TxHash)
+		log.Printf("%s Swap executed successfully: txHash=%s", utils.LogMarkerTrade, result.TxHash)
 		return nil
 	}
 
-	log.Printf("[JUPITER] All swap attempts failed: %v", lastErr)
+	log.Printf("%s All swap attempts failed: %v", utils.LogMarkerError, lastErr)
 	return fmt.Errorf("failed to execute swap after %d attempts: %w", retryAttempts, lastErr)
 }
 
