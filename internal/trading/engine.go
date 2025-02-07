@@ -1,6 +1,7 @@
 package trading
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -44,14 +45,12 @@ func NewTradingEngine(riskMgr risk.Manager, walletMgr wallet.Manager) *tradingEn
 }
 
 func (e *tradingEngine) PlaceOrder(order Order) error {
-	riskOrder := risk.Order{
-		Symbol:    order.Symbol,
-		Side:      order.Side,
+	if err := e.riskMgr.ValidateTrade(context.Background(), &risk.Trade{
+		Token:     order.Symbol,
 		Amount:    order.Amount,
+		Direction: order.Side,
 		Price:     order.Price,
-		OrderType: order.OrderType,
-	}
-	if err := e.riskMgr.ValidateOrder(riskOrder); err != nil {
+	}); err != nil {
 		return fmt.Errorf("risk validation failed: %w", err)
 	}
 
