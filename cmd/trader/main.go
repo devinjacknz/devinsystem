@@ -8,10 +8,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/pkg/agents"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/trading"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 )
 
 func main() {
@@ -19,25 +21,18 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize MongoDB
-	mongoClient, err := mongo.NewClient("mongodb://localhost:27017", "trading")
-	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
-	}
-	mongoRepo := mongo.NewRepository(mongoClient)
-
-	// Create MongoDB indexes
-	if err := mongoRepo.CreateIndexes(ctx); err != nil {
-		log.Fatalf("Failed to create indexes: %v", err)
-	}
-
 	// Initialize components
-	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"), mongoRepo)
-	ollama := models.NewOllamaClient("http://localhost:11434", "deepseek-r1")
-	riskMgr := trading.NewRiskManager()
+	marketData := market.NewHeliusClient(os.Getenv("RPC_ENDPOINT"))
 	
-	// Initialize exchange manager with Jupiter only
-	exchangeMgr := exchange.NewExchangeManager()
+	// Initialize Ollama with DeepSeek R1 model
+	modelFactory := models.NewModelFactory()
+	ollama := models.NewOllamaModel("deepseek-r1")
+	if err := modelFactory.RegisterModel("ollama", ollama); err != nil {
+		log.Fatalf("Failed to register Ollama model: %v", err)
+	}
+
+	// Initialize risk manager
+	riskMgr := trading.NewRiskManager()
 	
 	// Initialize wallet manager
 	walletMgr, err := wallet.NewWalletManager()
@@ -63,14 +58,8 @@ func main() {
 		}, nil
 	})
 
-	// Initialize monitor
-	monitor, err := trading.NewMonitor("/home/ubuntu/repos/devinsystem/trading.log")
-	if err != nil {
-		log.Fatalf("Failed to initialize monitor: %v", err)
-	}
-
 	// Initialize trading engine
-	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, mongoRepo, walletMgr)
+	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache, walletMgr)
 
 	// Start trading engine
 	if err := engine.Start(ctx); err != nil {
