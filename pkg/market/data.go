@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/devinjacknz/devinsystem/pkg/logging"
@@ -35,11 +37,23 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	request := rpcRequest{
-		Jsonrpc: "2.0",
-		ID:      1,
-		Method:  "getTokenSupply",
-		Params:  []interface{}{GetTokenAddress(token)},
+	// For SOL token, use getBalance instead of getTokenSupply
+	var request rpcRequest
+	if token == "So11111111111111111111111111111111111111112" {
+		// For SOL token, use getBalance
+		request = rpcRequest{
+			Jsonrpc: "2.0",
+			ID:      1,
+			Method:  "getBalance",
+			Params:  []interface{}{os.Getenv("WALLET")},
+		}
+	} else {
+		request = rpcRequest{
+			Jsonrpc: "2.0",
+			ID:      1,
+			Method:  "getTokenSupply",
+			Params:  []interface{}{GetTokenAddress(token)},
+		}
 	}
 
 	var response rpcResponse
@@ -47,17 +61,30 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		return nil, fmt.Errorf("failed to get token supply: %w", err)
 	}
 
-	var supply tokenAccountBalance
-	if err := json.Unmarshal(response.Result, &supply); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal supply: %w", err)
+	var price float64
+	if token == "So11111111111111111111111111111111111111112" {
+		var balance struct {
+			Value uint64 `json:"value"`
+		}
+		if err := json.Unmarshal(response.Result, &balance); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
+		}
+		price = float64(balance.Value) / 1e9 // Convert lamports to SOL
+		if price <= 0 {
+			log.Printf("%s Invalid SOL price from balance: %.8f", logging.LogMarkerError, price)
+			price = 100.0 // Default SOL price in USD
+		}
+	} else {
+		var supply tokenAccountBalance
+		if err := json.Unmarshal(response.Result, &supply); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal supply: %w", err)
+		}
+		amount, err := parseAmount(supply.Value.Amount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse amount: %w", err)
+		}
+		price = float64(amount) / 1e9
 	}
-
-	amount, err := parseAmount(supply.Value.Amount)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount: %w", err)
-	}
-
-	price := float64(amount) / 1e9
 
 	holders, err := c.getLargestTokenHolders(ctx, token)
 	if err != nil {
