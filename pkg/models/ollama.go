@@ -64,19 +64,8 @@ func (c *OllamaClient) GenerateTradeDecision(ctx context.Context, data interface
 		log.Printf("%s Invalid data type provided to AI model", logging.LogMarkerError)
 		return nil, fmt.Errorf("invalid data type: expected *market.MarketData")
 	}
-	systemPrompt := `You are a trading bot. Respond with exactly 3 lines:
-Line 1: BUY or SELL or NOTHING
-Line 2: A number between 0.1 and 0.9
-Line 3: A reason
 
-Example response:
-BUY
-0.6
-Price up 2%
-
-Do not include any other text. Only output these 3 lines.`
-
-	prompt := fmt.Sprintf(`Analyze this data and respond with exactly 3 lines:
+	prompt := fmt.Sprintf(`Analyze this market data and respond with exactly 3 lines:
 Token: %s
 Price: %.8f SOL
 Volume: %.2f SOL
@@ -166,15 +155,14 @@ Remember:
 
 	var response ollamaResponse
 	// Read and log raw response for debugging
-	var respBody []byte
-	respBody, err = io.ReadAll(resp.Body)
+	modelRespBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("%s Failed to read response body: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-	log.Printf("%s Raw API response: %s", logging.LogMarkerAI, string(respBody))
+	log.Printf("%s Raw API response: %s", logging.LogMarkerAI, string(modelRespBody))
 
-	if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(&response); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(modelRespBody)).Decode(&response); err != nil {
 		log.Printf("%s Failed to decode Ollama response: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
