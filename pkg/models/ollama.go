@@ -61,7 +61,7 @@ Consider:
 Respond with one of: BUY, SELL, or NOTHING followed by your reasoning.
 Include a confidence score (0-100) in your analysis.`
 
-	marketData := fmt.Sprintf(`Market Data:
+	prompt := fmt.Sprintf(`Market Data:
 Symbol: %s
 Price: %.8f
 Volume: %.2f
@@ -71,7 +71,7 @@ Timestamp: %s`, marketData.Symbol, marketData.Price, marketData.Volume, marketDa
 		Model: c.model,
 		Messages: []Message{
 			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: marketData},
+			{Role: "user", Content: prompt},
 		},
 		Stream: false,
 		Options: Options{
