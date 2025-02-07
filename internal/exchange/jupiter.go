@@ -115,10 +115,6 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 	
 	log.Printf("[JUPITER] All quote attempts failed: %v", lastErr)
 	return nil, fmt.Errorf("failed to get quote after %d attempts: %w", retryAttempts, lastErr)
-
-	log.Printf("[JUPITER] Successfully received quote: input=%s output=%s price=%.4f", 
-		quote.InputMint, quote.OutputMint, quote.Price)
-	return &quote, nil
 }
 
 func (j *JupiterDEX) ExecuteOrder(order Order) error {
@@ -183,16 +179,6 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 
 	log.Printf("[JUPITER] All swap attempts failed: %v", lastErr)
 	return fmt.Errorf("failed to execute swap after %d attempts: %w", retryAttempts, lastErr)
-	defer resp.Body.Close()
-
-	var swapResult SwapResponse
-	if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
-		log.Printf("[JUPITER] Failed to decode swap response: %v", err)
-		return fmt.Errorf("failed to decode swap response: %w", err)
-	}
-	log.Printf("[JUPITER] Swap executed successfully: txHash=%s", swapResult.TxHash)
-
-	return nil
 }
 
 func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
@@ -203,17 +189,23 @@ func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
 
 	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
-		resp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v1/price/%s", token))
+		var httpResp *http.Response
+		httpResp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v1/price/%s", token))
 		if err != nil {
 			lastErr = err
+			backoff := time.Duration(attempt) * retryDelay
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			time.Sleep(backoff)
 			continue
 		}
 
 		var price struct {
 			Price float64 `json:"price"`
 		}
-		err = json.NewDecoder(resp.Body).Decode(&price)
-		resp.Body.Close()
+		err = json.NewDecoder(httpResp.Body).Decode(&price)
+		httpResp.Body.Close()
 		if err != nil {
 			lastErr = err
 			continue
