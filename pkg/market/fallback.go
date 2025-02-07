@@ -9,8 +9,8 @@ import (
 )
 
 type FallbackClient struct {
-	primary   *HeliusClient
-	fallback  *HeliusClient
+	primary   Client
+	fallback  Client
 	retries   int
 	backoff   time.Duration
 }
@@ -21,14 +21,14 @@ func NewFallbackClient(endpoint string) *FallbackClient {
 	primary.(*HeliusClient).httpClient.Timeout = 5 * time.Second
 
 	// Fallback client with aggressive settings
-	fallback := NewHeliusClient(endpoint)
-	fallback.(*HeliusClient).httpClient.Timeout = 3 * time.Second
-	fallback.(*HeliusClient).limiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+	fallbackClient := NewHeliusClient(endpoint)
+	if helius, ok := fallbackClient.(*HeliusClient); ok {
+		helius.httpClient.Timeout = 3 * time.Second
+		helius.limiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+	}
 
-	primaryClient := primary.(*HeliusClient)
-	fallbackClient := fallback.(*HeliusClient)
 	return &FallbackClient{
-		primary:  primaryClient,
+		primary:  primary,
 		fallback: fallbackClient,
 		retries:  5,
 		backoff:  500 * time.Millisecond,
