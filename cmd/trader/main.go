@@ -48,12 +48,15 @@ func main() {
 	// Initialize risk manager with 3M max exposure for meme coins
 	riskMgr := risk.NewRiskManager(nil, 3_000_000)
 
-	// Initialize token cache with 1-hour TTL and 30 token limit
+	// Initialize token cache with test tokens
 	tokenCache := utils.NewTokenCache(time.Hour, 30, func(ctx context.Context, token string) (*utils.TokenInfo, error) {
 		data, err := marketData.GetMarketData(ctx, token)
 		if err != nil {
+			log.Printf("%s Failed to get market data for %s: %v", logging.LogMarkerError, token, err)
 			return nil, err
 		}
+		log.Printf("%s Retrieved market data for %s: price=%.8f volume=%.2f", logging.LogMarkerMarket,
+			token, data.Price, data.Volume)
 		return &utils.TokenInfo{
 			Symbol:    data.Symbol,
 			Price:     data.Price,
@@ -61,6 +64,18 @@ func main() {
 			UpdatedAt: data.Timestamp,
 		}, nil
 	})
+
+	// Pre-populate cache with test tokens
+	testTokens := []string{
+		"So11111111111111111111111111111111111111112", // Wrapped SOL
+		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+	}
+	for _, token := range testTokens {
+		if _, err := tokenCache.Get(ctx, token); err != nil {
+			log.Printf("%s Failed to initialize token %s: %v", logging.LogMarkerError, token, err)
+		}
+	}
 
 	// Initialize trading engine with Jupiter DEX only
 	engine := trading.NewEngine(marketData, ollama, riskMgr, tokenCache)
