@@ -130,18 +130,13 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		return fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	// Get quote for the order
-	quote, err := j.GetQuote(ctx, order.Symbol, "USDC", fmt.Sprintf("%.0f", order.Amount))
-	if err != nil {
-		log.Printf("[JUPITER] Failed to get quote: %v", err)
-		return fmt.Errorf("failed to get quote: %w", err)
-	}
-	log.Printf("[JUPITER] Received quote: inAmount=%s outAmount=%s price=%.4f", 
-		quote.InAmount, quote.OutAmount, quote.Price)
-
-	// Execute swap with wallet
+	// Get quote and execute swap
 	swapReq := &SwapRequest{
-		QuoteResponse:  *quote,
+		QuoteResponse: QuoteResponse{
+			InputMint:  order.Symbol,
+			OutputMint: "USDC",
+			InAmount:   fmt.Sprintf("%.0f", order.Amount),
+		},
 		UserPublicKey: order.Wallet,
 		SlippageBps:  50, // 0.5% slippage tolerance
 	}
@@ -206,18 +201,26 @@ func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
 		return 0, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	resp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v1/price/%s", token))
-	if err != nil {
-		return 0, fmt.Errorf("failed to get market price: %w", err)
-	}
-	defer resp.Body.Close()
+	var lastErr error
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
+		resp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v1/price/%s", token))
+		if err != nil {
+			lastErr = err
+			continue
+		}
 
-	var price struct {
-		Price float64 `json:"price"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&price); err != nil {
-		return 0, fmt.Errorf("failed to decode price response: %w", err)
+		var price struct {
+			Price float64 `json:"price"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&price)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		return price.Price, nil
 	}
 
-	return price.Price, nil
+	return 0, fmt.Errorf("failed to get market price after %d attempts: %w", retryAttempts, lastErr)
 }
