@@ -91,15 +91,17 @@ Remember:
 	request := ollamaRequest{
 		Model: c.model,
 		Messages: []Message{
-			{Role: "system", Content: systemPrompt},
+			{Role: "system", Content: "You are a trading bot that outputs exactly 3 lines: BUY/SELL/NOTHING, confidence (0.1-0.9), reason"},
+			{Role: "user", Content: "Example response:\nBUY\n0.6\nPrice up 2%"},
+			{Role: "assistant", Content: "BUY\n0.6\nPrice up 2%"},
 			{Role: "user", Content: prompt},
 		},
 		Stream: false,
 		Options: Options{
-			Temperature: 0.1,  // Very low temperature for consistent format
-			TopP:        0.1,  // Reduce randomness
-			TopK:        10,   // Limit token choices
-			Seed:        1234, // Fixed seed for reproducibility
+			Temperature: 0.1,
+			TopP:        0.1,
+			TopK:        10,
+			Seed:        1234,
 		},
 	}
 
@@ -164,7 +166,8 @@ Remember:
 
 	var response ollamaResponse
 	// Read and log raw response for debugging
-	respBody, err := io.ReadAll(resp.Body)
+	var respBody []byte
+	respBody, err = io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("%s Failed to read response body: %v", logging.LogMarkerError, err)
 		return nil, fmt.Errorf("failed to read response: %w", err)
