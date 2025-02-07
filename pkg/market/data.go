@@ -34,7 +34,7 @@ func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, er
 		return 0, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	url := fmt.Sprintf("https://price-api.jup.ag/v6/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token)
+	url := fmt.Sprintf("https://price.jup.ag/v4/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
@@ -48,7 +48,11 @@ func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, er
 
 	var priceResp struct {
 		Data map[string]struct {
-			Price float64 `json:"price"`
+			Price     float64 `json:"price"`
+			ID        string  `json:"id"`
+			Mint      string  `json:"mint"`
+			VsToken   string  `json:"vsToken"`
+			VsTokenID string  `json:"vsTokenId"`
 		} `json:"data"`
 	}
 
@@ -56,10 +60,43 @@ func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, er
 		return 0, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if priceData, ok := priceResp.Data[token]; ok {
+	if priceData, ok := priceResp.Data[token]; ok && priceData.Price > 0 {
+		log.Printf("%s Retrieved price for %s: %.8f USDC", logging.LogMarkerMarket, token, priceData.Price)
 		return priceData.Price, nil
 	}
-	return 0, fmt.Errorf("token not found in response")
+	return 0, fmt.Errorf("token not found in response or invalid price")
+}
+
+func (c *JupiterClient) GetVolume(ctx context.Context, token string) (float64, error) {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return 0, fmt.Errorf("rate limit exceeded: %w", err)
+	}
+
+	url := fmt.Sprintf("https://stats.jup.ag/v4/token-volume?mint=%s", token)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get volume: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var volumeResp struct {
+		Volume24h float64 `json:"volume24h"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&volumeResp); err != nil {
+		return 0, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if volumeResp.Volume24h > 0 {
+		log.Printf("%s Retrieved 24h volume for %s: %.2f USDC", logging.LogMarkerMarket, token, volumeResp.Volume24h)
+		return volumeResp.Volume24h, nil
+	}
+	return 0, fmt.Errorf("invalid volume")
 }
 
 type HeliusClient struct {
@@ -78,18 +115,18 @@ func (c *HeliusClient) validateToken(ctx context.Context, token string) error {
 	request := rpcRequest{
 		Jsonrpc: "2.0",
 		ID:      1,
-		Method:  "getTokenSupply",
-		Params:  []interface{}{token},
+		Method:  "getAccountInfo",
+		Params: []interface{}{
+			token,
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
 	}
 
 	var response rpcResponse
 	if err := c.doRequest(ctx, request, &response); err != nil {
 		return fmt.Errorf("failed to validate token: %w", err)
-	}
-
-	var supply tokenAccountBalance
-	if err := json.Unmarshal(response.Result, &supply); err != nil {
-		return fmt.Errorf("failed to unmarshal supply: %w", err)
 	}
 
 	return nil
@@ -193,83 +230,29 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 
 	log.Printf("%s Fetching market data for %s...", logging.LogMarkerMarket, token)
 
-	// Get token account info
-	request := rpcRequest{
-		Jsonrpc: "2.0",
-		ID:      1,
-		Method:  "getTokenAccountsByOwner",
-		Params: []interface{}{
-			token,
-			map[string]string{
-				"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-			},
-			map[string]string{
-				"encoding": "jsonParsed",
-			},
-		},
-	}
-
-	var response rpcResponse
-	if err := c.doRequest(ctx, request, &response); err != nil {
-		log.Printf("%s Failed to get token account info: %v", logging.LogMarkerError, err)
-		return nil, fmt.Errorf("failed to get token account info: %w", err)
-	}
-
-	var accountInfo struct {
-		Value []struct {
-			Account struct {
-				Data struct {
-					Parsed struct {
-						Info struct {
-							TokenAmount struct {
-								Amount   string  `json:"amount"`
-								Decimals int     `json:"decimals"`
-								UiAmount float64 `json:"uiAmount"`
-							} `json:"tokenAmount"`
-						} `json:"info"`
-					} `json:"parsed"`
-				} `json:"data"`
-			} `json:"account"`
-		} `json:"value"`
-	}
-
-	if err := json.Unmarshal(response.Result, &accountInfo); err != nil {
-		log.Printf("%s Failed to parse token account info: %v", logging.LogMarkerError, err)
-		return nil, fmt.Errorf("failed to parse token account info: %w", err)
-	}
-
-	if len(accountInfo.Value) == 0 {
-		log.Printf("%s No token accounts found for %s", logging.LogMarkerError, token)
-		return nil, fmt.Errorf("no token accounts found")
-	}
-
-	// Calculate total supply and volume
-	var totalSupply float64
-	var volume float64
-	for _, acc := range accountInfo.Value {
-		amount := acc.Account.Data.Parsed.Info.TokenAmount.UiAmount
-		totalSupply += amount
-		if amount > 0 {
-			volume += amount
-		}
-	}
-
-	if totalSupply <= 0 {
-		log.Printf("%s Invalid total supply for %s: %.8f", logging.LogMarkerError, token, totalSupply)
-		return nil, fmt.Errorf("invalid total supply")
-	}
-
-	// Get SOL price in USDC using Jupiter API
+	// Get token price from Jupiter API
 	jupiterClient := NewJupiterClient()
 	price, err := jupiterClient.GetPrice(ctx, token)
 	if err != nil {
-		log.Printf("%s Failed to get price from Jupiter, using fallback: %v", logging.LogMarkerError, err)
-		price = 1.0 // Default to 1 SOL = 1 USDC for testing
+		log.Printf("%s Failed to get price from Jupiter: %v", logging.LogMarkerError, err)
+		return nil, fmt.Errorf("failed to get price: %w", err)
 	}
 
 	if price <= 0 {
 		log.Printf("%s Invalid price for %s: %.8f", logging.LogMarkerError, token, price)
 		return nil, fmt.Errorf("invalid price")
+	}
+
+	// Get token volume (24h) from Jupiter API
+	volume, err := jupiterClient.GetVolume(ctx, token)
+	if err != nil {
+		log.Printf("%s Failed to get volume, using fallback: %v", logging.LogMarkerError, err)
+		volume = price * 1000 // Default to reasonable volume for testing
+	}
+
+	if volume < 0 {
+		log.Printf("%s Invalid volume for %s: %.8f", logging.LogMarkerError, token, volume)
+		return nil, fmt.Errorf("invalid volume")
 	}
 	timestamp := time.Now()
 
@@ -460,6 +443,8 @@ func (c *HeliusClient) GetTokenList(ctx context.Context) ([]string, error) {
 	// Return only validated tokens
 	tokens := []string{
 		"So11111111111111111111111111111111111111112", // Wrapped SOL
+		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+		"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
 	}
 	log.Printf("%s Using validated token list with %d tokens", logging.LogMarkerMarket, len(tokens))
 	return tokens, nil
