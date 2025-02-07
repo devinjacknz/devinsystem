@@ -25,9 +25,11 @@ func NewFallbackClient(endpoint string) *FallbackClient {
 	fallback.(*HeliusClient).httpClient.Timeout = 3 * time.Second
 	fallback.(*HeliusClient).limiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
 
+	primaryClient := primary.(*HeliusClient)
+	fallbackClient := fallback.(*HeliusClient)
 	return &FallbackClient{
-		primary:  primary,
-		fallback: fallback,
+		primary:  primaryClient,
+		fallback: fallbackClient,
 		retries:  5,
 		backoff:  500 * time.Millisecond,
 	}

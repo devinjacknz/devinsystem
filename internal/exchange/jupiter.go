@@ -152,14 +152,9 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		return fmt.Errorf("failed to marshal swap request: %w", err)
 	}
 
-	var (
-		lastErr error
-		swapResult SwapResponse
-	)
-
+	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
-		var resp *http.Response
-		resp, err = j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
+		resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
 		if err != nil {
 			lastErr = err
 			backoff := time.Duration(attempt) * retryDelay
@@ -171,20 +166,23 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 			time.Sleep(backoff)
 			continue
 		}
-		defer resp.Body.Close()
 
+		var result SwapResponse
 		if resp.StatusCode != http.StatusOK {
 			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			lastErr = fmt.Errorf("swap API returned status %d: %s", resp.StatusCode, respBody)
 			continue
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&swapResult); err != nil {
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		resp.Body.Close()
+		if err != nil {
 			lastErr = fmt.Errorf("failed to decode swap response: %w", err)
 			continue
 		}
 
-		log.Printf("[JUPITER] Swap executed successfully: txHash=%s", swapResult.TxHash)
+		log.Printf("[JUPITER] Swap executed successfully: txHash=%s", result.TxHash)
 		return nil
 	}
 
