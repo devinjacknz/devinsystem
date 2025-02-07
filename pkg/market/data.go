@@ -119,7 +119,7 @@ func (c *HeliusClient) SaveMarketData(ctx context.Context, data *MarketData) err
 	defer f.Close()
 
 	logger := log.New(f, "", log.LstdFlags)
-	logger.Printf("%s %s Price: %.8f Volume: %.2f Time: %s", utils.LogMarkerMarket,
+	logger.Printf("%s %s Price: %.8f Volume: %.2f Time: %s", logging.LogMarkerMarket,
 		data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time.RFC3339))
 	return nil
 }
