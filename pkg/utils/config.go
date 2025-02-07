@@ -7,7 +7,6 @@ import (
 
 type Config struct {
 	APIPort     int    `json:"api_port"`
-	JWTSecret   string `json:"jwt_secret"`
 	Environment string `json:"environment"`
 	
 	// Exchange configurations
@@ -15,8 +14,8 @@ type Config struct {
 	PumpFunURL   string `json:"pump_fun_url"`
 	
 	// AI model configurations
-	OllamaURL    string `json:"ollama_url"`
-	DeepSeekURL  string `json:"deepseek_url"`
+	OllamaURL     string `json:"ollama_url"`
+	DeepSeekModel string `json:"deepseek_model"`
 }
 
 func LoadConfig(path string) (*Config, error) {

@@ -1,0 +1,8 @@
+{
+    "api_port": 8080,
+    "environment": "production",
+    "solana_rpc_url": "<request_auth>Please provide the Solana RPC URL for mainnet access</request_auth>",
+    "pump_fun_url": "<request_auth>Please provide the Pump.fun API URL for trading access</request_auth>",
+    "ollama_url": "http://localhost:11434",
+    "deepseek_model": "deepseek-r1-1.5b"
+}

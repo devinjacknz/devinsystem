@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 	
-	"github.com/devinjacknz/devintrade/internal/api"
-	"github.com/devinjacknz/devintrade/internal/risk"
-	"github.com/devinjacknz/devintrade/internal/trading"
-	"github.com/devinjacknz/devintrade/internal/wallet"
+	"github.com/devinjacknz/devinsystem/internal/api"
+	"github.com/devinjacknz/devinsystem/internal/risk"
+	"github.com/devinjacknz/devinsystem/internal/trading"
+	"github.com/devinjacknz/devinsystem/internal/wallet"
 )
 
 func main() {

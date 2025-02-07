@@ -4,7 +4,7 @@ import (
 	"testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/devinjacknz/devintrade/internal/ai"
+	"github.com/devinjacknz/devinsystem/internal/ai"
 )
 
 type MockAIService struct {

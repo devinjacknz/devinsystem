@@ -10,13 +10,13 @@ type ExchangeManager struct {
 	exchanges map[string]Exchange
 }
 
-func NewExchangeManager() *ExchangeManager {
+func NewExchangeManager(solanaURL, pumpURL string) *ExchangeManager {
 	manager := &ExchangeManager{
 		exchanges: make(map[string]Exchange),
 	}
 
-	manager.exchanges["solana"] = NewSolanaDEX()
-	manager.exchanges["pump"] = NewPumpFun()
+	manager.exchanges["solana"] = NewSolanaDEX(solanaURL)
+	manager.exchanges["pump"] = NewPumpFun(pumpURL)
 
 	return manager
 }

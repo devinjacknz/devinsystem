@@ -9,6 +9,15 @@ type SolanaDEX struct {
 	mu      sync.RWMutex
 	client  interface{}
 	markets map[string]*Market
+	name    string
+}
+
+func (dex *SolanaDEX) Name() string {
+	return dex.name
+}
+
+func (dex *SolanaDEX) GetMarketData() (*MarketData, error) {
+	return &MarketData{}, nil
 }
 
 type Market struct {
@@ -29,9 +38,16 @@ type PriceLevel struct {
 	Orders int
 }
 
-func NewSolanaDEX() *SolanaDEX {
+type MarketData struct {
+	Symbol string
+	Price  float64
+	Volume float64
+}
+
+func NewSolanaDEX(rpcURL string) *SolanaDEX {
 	return &SolanaDEX{
 		markets: make(map[string]*Market),
+		name:    "SolanaDEX",
 	}
 }
 

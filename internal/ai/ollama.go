@@ -8,24 +8,27 @@ import (
 )
 
 type OllamaClient struct {
-	endpoint string
-	model    string
+	endpoint    string
+	model       string
+	temperature float64
 }
 
 type OllamaRequest struct {
-	Model    string `json:"model"`
-	Prompt   string `json:"prompt"`
-	Stream   bool   `json:"stream"`
+	Model       string  `json:"model"`
+	Prompt      string  `json:"prompt"`
+	Stream      bool    `json:"stream"`
+	Temperature float64 `json:"temperature"`
 }
 
 type OllamaResponse struct {
 	Response string `json:"response"`
 }
 
-func NewOllamaClient(endpoint, model string) *OllamaClient {
+func NewOllamaClient(endpoint, model string, temperature float64) *OllamaClient {
 	return &OllamaClient{
-		endpoint: endpoint,
-		model:    model,
+		endpoint:    endpoint,
+		model:       model,
+		temperature: temperature,
 	}
 }
 
@@ -36,9 +39,10 @@ func (c *OllamaClient) AnalyzeMarket(data MarketData) (*Analysis, error) {
 	)
 
 	req := OllamaRequest{
-		Model:  c.model,
-		Prompt: prompt,
-		Stream: false,
+		Model:       c.model,
+		Prompt:      prompt,
+		Stream:      false,
+		Temperature: c.temperature,
 	}
 
 	jsonData, err := json.Marshal(req)
