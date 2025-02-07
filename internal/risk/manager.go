@@ -1,6 +1,7 @@
 package risk
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -15,8 +16,16 @@ type Order struct {
 	OrderType    string
 }
 
+type Trade struct {
+	Token     string
+	Amount    float64
+	Direction string
+	Price     float64
+}
+
 type Manager interface {
 	ValidateOrder(order Order) error
+	ValidateTrade(ctx context.Context, trade *Trade) error
 	CheckExposure(symbol string) (float64, error)
 	UpdateStopLoss(symbol string, currentPrice float64) error
 }
@@ -50,11 +59,11 @@ func NewRiskManager(aiService ai.Service, maxExposure float64) *RiskManager {
 	}
 }
 
-func (rm *RiskManager) ValidateOrder(order Order) error {
+func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
 	// Check AI risk analysis
 	riskAnalysis, err := rm.aiService.AnalyzeRisk(ai.MarketData{
-		Symbol: order.Symbol,
-		Price:  order.Price,
+		Symbol: trade.Token,
+		Price:  trade.Price,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to analyze risk: %w", err)

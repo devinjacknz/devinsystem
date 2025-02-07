@@ -104,7 +104,13 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 	}
 
 	// Execute swap with wallet
-	if err := e.jupiter.ExecuteSwap(ctx, quote, tradingWallet); err != nil {
+	if err := e.jupiter.ExecuteOrder(Order{
+		Symbol:    token,
+		Side:      decision.Action,
+		Amount:    amount,
+		Price:     data.Price,
+		OrderType: "MARKET",
+	}); err != nil {
 		return fmt.Errorf("swap execution failed: %w", err)
 	}
 
