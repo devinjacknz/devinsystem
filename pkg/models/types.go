@@ -4,12 +4,7 @@ import (
 	"context"
 )
 
-type TradeDecision struct {
-	Action      string
-	Confidence  float64
-	Reasoning   string
-	Metadata    map[string]interface{}
-}
+// TradeDecision is defined in model.go
 
 type Client interface {
 	GenerateTradeDecision(ctx context.Context, data interface{}) (*TradeDecision, error)

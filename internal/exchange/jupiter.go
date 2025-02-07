@@ -110,28 +110,6 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 	}
 
 	return nil
-	req := &SwapRequest{
-		QuoteResponse:  *quote,
-		UserPublicKey: wallet.GetPublicKey(),
-	}
-
-	swapBody, err := json.Marshal(swapReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal swap request: %w", err)
-	}
-
-	swapResp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(swapBody))
-	if err != nil {
-		return fmt.Errorf("failed to execute swap: %w", err)
-	}
-	defer swapResp.Body.Close()
-
-	var swapResult SwapResponse
-	if err := json.NewDecoder(swapResp.Body).Decode(&swapResult); err != nil {
-		return fmt.Errorf("failed to decode swap response: %w", err)
-	}
-
-	return nil
 }
 
 func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
