@@ -1,7 +1,9 @@
 package monitoring
 
 import (
+	"fmt"
 	"log"
+	"os"
 )
 
 type Service struct {
@@ -9,9 +11,22 @@ type Service struct {
 }
 
 func NewService() *Service {
-	return &Service{
-		logFile: "trading.log",
+	s := &Service{
+		logFile: "/home/ubuntu/repos/devinsystem/trading.log",
 	}
+	if err := s.init(); err != nil {
+		log.Printf("[ERROR] Failed to initialize monitoring service: %v", err)
+	}
+	return s
+}
+
+func (s *Service) init() error {
+	f, err := os.OpenFile(s.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	log.SetOutput(f)
+	return nil
 }
 
 func (s *Service) LogTrade(symbol string, side string, amount float64, price float64) {
@@ -36,4 +51,9 @@ func (s *Service) LogSystem(msg string) {
 
 func (s *Service) LogError(msg string) {
 	log.Printf("[ERROR] %s", msg)
+}
+
+func (s *Service) LogJupiterSwap(inputToken, outputToken string, inputAmount, outputAmount float64, priceImpact float64) {
+	log.Printf("[JUPITER] Swap %f %s -> %f %s (Impact: %.2f%%)",
+		inputAmount, inputToken, outputAmount, outputToken, priceImpact*100)
 }

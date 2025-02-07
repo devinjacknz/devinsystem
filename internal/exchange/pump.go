@@ -16,8 +16,8 @@ func (p *PumpFun) Name() string {
 	return p.name
 }
 
-func (p *PumpFun) GetMarketData() (*MarketData, error) {
-	return &MarketData{}, nil
+func (p *PumpFun) GetMarketData() ([]*MarketData, error) {
+	return []*MarketData{}, nil
 }
 
 func NewPumpFun(apiURL string) *PumpFun {
