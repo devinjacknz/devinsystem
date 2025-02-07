@@ -28,6 +28,23 @@ type HeliusClient struct {
 	cacheTTL    time.Duration
 }
 
+func (c *HeliusClient) ValidateConnection(ctx context.Context) error {
+	request := rpcRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "getHealth",
+	}
+
+	var response rpcResponse
+	if err := c.doRequest(ctx, request, &response); err != nil {
+		log.Printf("%s Primary RPC validation failed: %v", logging.LogMarkerError, err)
+		return fmt.Errorf("RPC validation failed: %w", err)
+	}
+
+	log.Printf("%s Successfully validated RPC connection to %s", logging.LogMarkerMarket, c.rpcEndpoint)
+	return nil
+}
+
 type rpcRequest struct {
 	Jsonrpc string        `json:"jsonrpc"`
 	ID      int           `json:"id"`
