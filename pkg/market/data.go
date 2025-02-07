@@ -1,6 +1,7 @@
 package market
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,55 +15,9 @@ import (
 )
 
 type HeliusClient struct {
-	rpcEndpoint  string
-	fallbackRPC  string
-	httpClient   *http.Client
-	limiter      *rate.Limiter
-	mu           sync.RWMutex
-	cache        map[string]*MarketData
-	cacheTTL     time.Duration
-}
-
-type MarketData struct {
-	Symbol    string
-	Price     float64
-	Volume    float64
-	Timestamp time.Time
-}
-
-type Client interface {
-	GetMarketData(ctx context.Context, token string) (*MarketData, error)
-	ValidateConnection(ctx context.Context) error
-	GetTokenList(ctx context.Context) ([]string, error)
-}
-
-type rpcRequest struct {
-	Jsonrpc string        `json:"jsonrpc"`
-	ID      int           `json:"id"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-}
-
-type rpcResponse struct {
-	Result json.RawMessage `json:"result"`
-	Error  *rpcError      `json:"error,omitempty"`
-}
-
-type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-type tokenAccountBalance struct {
-	Value struct {
-		Amount   string `json:"amount"`
-		Decimals int    `json:"decimals"`
-	} `json:"value"`
-}
-
-type tokenHolder struct {
-	Address string `json:"address"`
-	Amount  string `json:"amount"`
+	rpcEndpoint string
+	httpClient  *http.Client
+	limiter     *rate.Limiter
 }
 
 func NewHeliusClient(rpcEndpoint string) *HeliusClient {
@@ -70,24 +25,13 @@ func NewHeliusClient(rpcEndpoint string) *HeliusClient {
 		rpcEndpoint = "https://eclipse.helius-rpc.com/"
 	}
 	return &HeliusClient{
-		rpcEndpoint:  rpcEndpoint,
-		fallbackRPC:  "https://eclipse.helius-rpc.com/",
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
-		limiter:      rate.NewLimiter(rate.Every(time.Second), 1),
-		cache:        make(map[string]*MarketData),
-		cacheTTL:     5 * time.Minute,
+		rpcEndpoint: rpcEndpoint,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		limiter:     rate.NewLimiter(rate.Every(time.Second), 1),
 	}
 }
 
 func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*MarketData, error) {
-	c.mu.RLock()
-	if cached, ok := c.cache[token]; ok && time.Since(cached.Timestamp) < c.cacheTTL {
-		c.mu.RUnlock()
-		log.Printf("%s Using cached data for %s", logging.LogMarkerMarket, token)
-		return cached, nil
-	}
-	c.mu.RUnlock()
-
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit exceeded: %w", err)
 	}
@@ -135,10 +79,6 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		Timestamp: time.Now(),
 	}
 
-	c.mu.Lock()
-	c.cache[token] = data
-	c.mu.Unlock()
-
 	log.Printf("%s Retrieved data for %s: price=%.8f volume=%.2f", logging.LogMarkerMarket, token, price, volume)
 	return data, nil
 }
@@ -171,6 +111,10 @@ func (c *HeliusClient) GetTokenList(ctx context.Context) ([]string, error) {
 	}
 	log.Printf("%s Using validated token list with %d tokens", logging.LogMarkerMarket, len(tokens))
 	return tokens, nil
+}
+
+func (c *HeliusClient) GetTopTokens(ctx context.Context) ([]string, error) {
+	return c.GetTokenList(ctx)
 }
 
 func (c *HeliusClient) getLargestTokenHolders(ctx context.Context, token string) ([]tokenHolder, error) {
@@ -223,6 +167,35 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 	}
 
 	return nil
+}
+
+type rpcRequest struct {
+	Jsonrpc string        `json:"jsonrpc"`
+	ID      int           `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+}
+
+type rpcResponse struct {
+	Result json.RawMessage `json:"result"`
+	Error  *rpcError      `json:"error,omitempty"`
+}
+
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type tokenAccountBalance struct {
+	Value struct {
+		Amount   string `json:"amount"`
+		Decimals int    `json:"decimals"`
+	} `json:"value"`
+}
+
+type tokenHolder struct {
+	Address string `json:"address"`
+	Amount  string `json:"amount"`
 }
 
 func parseAmount(amount string) (int64, error) {
