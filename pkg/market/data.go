@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"math/rand"
 	"time"
 
 	"github.com/devinjacknz/devinsystem/pkg/logging"
@@ -82,8 +83,16 @@ func NewHeliusClient(rpcEndpoint string) Client {
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
 		fallbackRPC: eclipseRPC,
-		httpClient:  &http.Client{Timeout: 3 * time.Second},
-		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
+		httpClient:  &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 100,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+		},
+		limiter:     rate.NewLimiter(rate.Every(2*time.Second), 2), // 2 RPS burst for better reliability
 		mu:          sync.RWMutex{},
 		cache:       make(map[string]*MarketData),
 		cacheTTL:    5 * time.Minute,
@@ -240,25 +249,35 @@ func (c *HeliusClient) doRequestWithEndpoint(ctx context.Context, endpoint strin
 		if err != nil {
 			log.Printf("%s Failed to send RPC request (attempt %d/5): %v", logging.LogMarkerError, attempt, err)
 			if attempt < 5 {
-				backoff := time.Duration(attempt) * 500 * time.Millisecond
-				log.Printf("%s Retrying in %v...", logging.LogMarkerRetry, backoff)
-				time.Sleep(backoff)
+				// Exponential backoff with jitter
+				backoff := time.Duration(1<<uint(attempt-1))*time.Second + time.Duration(rand.Int63n(1000))*time.Millisecond
+				log.Printf("%s Network error on attempt %d, retrying in %v...", logging.LogMarkerRetry, attempt, backoff)
+				select {
+				case <-ctx.Done():
+					return fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+				case <-time.After(backoff):
+				}
 				continue
 			}
 			return fmt.Errorf("failed to send request: %w", err)
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			log.Printf("%s RPC returned non-200 status: %d, body: %s", logging.LogMarkerError, resp.StatusCode, string(body))
-			if attempt < 5 {
-				backoff := time.Duration(attempt) * 500 * time.Millisecond
-				log.Printf("%s Retrying in %v...", logging.LogMarkerRetry, backoff)
-				time.Sleep(backoff)
-				continue
-			}
-			return fmt.Errorf("RPC returned status %d", resp.StatusCode)
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				log.Printf("%s RPC returned non-200 status: %d, body: %s", logging.LogMarkerError, resp.StatusCode, string(body))
+				if attempt < 5 {
+					// Exponential backoff with jitter
+					backoff := time.Duration(1<<uint(attempt-1))*time.Second + time.Duration(rand.Int63n(1000))*time.Millisecond
+					log.Printf("%s Attempt %d failed with status %d, retrying in %v...", logging.LogMarkerRetry, attempt, resp.StatusCode, backoff)
+					select {
+					case <-ctx.Done():
+						return fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+					case <-time.After(backoff):
+					}
+					continue
+				}
+				return fmt.Errorf("RPC returned status %d", resp.StatusCode)
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
