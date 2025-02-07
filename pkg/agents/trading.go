@@ -21,7 +21,7 @@ type TradingAgent struct {
 	stopChan  chan struct{}
 }
 
-func NewTradingAgent(marketData market.Client, ollama models.Client, riskMgr *risk.Manager) *TradingAgent {
+func NewTradingAgent(marketData market.Client, ollama models.Client, riskMgr risk.Manager) *TradingAgent {
 	return &TradingAgent{
 		BaseAgent:  NewBaseAgent("trading"),
 		marketData: marketData,
