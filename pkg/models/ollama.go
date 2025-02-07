@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devinjacknz/devinsystem/internal/ai"
 	"github.com/devinjacknz/devinsystem/pkg/logging"
 	"github.com/devinjacknz/devinsystem/pkg/market"
 )
@@ -19,6 +20,33 @@ type OllamaClient struct {
 	baseURL    string
 	httpClient *http.Client
 	model      string
+}
+
+func (c *OllamaClient) AnalyzeMarket(data market.MarketData) (*ai.Analysis, error) {
+	decision, err := c.GenerateTradeDecision(context.Background(), &data)
+	if err != nil {
+		return nil, err
+	}
+	return &ai.Analysis{
+		Action:     decision.Action,
+		Confidence: decision.Confidence,
+		Reasoning:  decision.Reasoning,
+		Model:      decision.Model,
+		Timestamp:  decision.Timestamp,
+	}, nil
+}
+
+func (c *OllamaClient) AnalyzeRisk(data market.MarketData) (*ai.RiskAnalysis, error) {
+	decision, err := c.GenerateTradeDecision(context.Background(), &data)
+	if err != nil {
+		return nil, err
+	}
+	return &ai.RiskAnalysis{
+		Symbol:        data.Symbol,
+		StopLossPrice: data.Price * 0.95, // 5% stop loss
+		RiskLevel:     "MEDIUM",
+		Confidence:    decision.Confidence,
+	}, nil
 }
 
 type ollamaRequest struct {
