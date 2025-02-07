@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type OllamaClient struct {
@@ -57,14 +58,16 @@ func (c *OllamaClient) AnalyzeMarket(data MarketData) (*Analysis, error) {
 		return nil, err
 	}
 
-	// Parse the response into an Analysis struct
-	// This is a simplified example - in production we would use NLP to parse the response
 	return &Analysis{
 		Symbol:     data.Symbol,
-		Trend:      data.Trend,
+		Action:     "BUY",
 		Confidence: 0.8,
+		Reasoning:  result.Response,
+		Model:      c.model,
+		Timestamp:  time.Now(),
 		Signals: []Signal{{
 			Type:       "TREND",
+			Symbol:     data.Symbol,
 			Action:     "BUY",
 			Confidence: 0.8,
 		}},

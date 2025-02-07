@@ -1,12 +1,17 @@
 package ai
 
+import "time"
+
 type MockService struct{}
 
 func (m *MockService) AnalyzeMarket(data MarketData) (*Analysis, error) {
 	return &Analysis{
 		Symbol:     data.Symbol,
-		Trend:      "neutral",
+		Action:     "NOTHING",
 		Confidence: 0.5,
+		Reasoning:  "Mock analysis for testing",
+		Model:      "mock",
+		Timestamp:  time.Now(),
 		Signals:    []Signal{
 			{
 				Type:       "price",
