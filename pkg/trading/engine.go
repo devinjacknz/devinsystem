@@ -64,28 +64,35 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64) error {
+	start := time.Now()
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	defer func() {
+		log.Printf("[PERF] Trade execution for %s took %v", token, time.Since(start))
+	}()
 
-	log.Printf("[TRADE] Starting trade execution for %s, amount: %.4f", token, amount)
+	log.Printf("[TRADE] Starting trade execution for %s, amount: %.4f using wallet: %s", 
+		token, amount, os.Getenv("WALLET"))
 
-	// Get market data
+	// Get market data with timing
+	marketStart := time.Now()
 	data, err := e.marketData.GetMarketData(ctx, token)
 	if err != nil {
 		log.Printf("[ERROR] Failed to get market data: %v", err)
 		return fmt.Errorf("failed to get market data: %w", err)
 	}
-	log.Printf("[MARKET] Retrieved market data for %s: price=%.4f volume=%.2f", 
-		token, data.Price, data.Volume)
+	log.Printf("[MARKET] Retrieved data for %s: price=%.4f volume=%.2f (took %v)", 
+		token, data.Price, data.Volume, time.Since(marketStart))
 
-	// Get AI decision
+	// Get AI decision with timing
+	aiStart := time.Now()
 	decision, err := e.ollama.GenerateTradeDecision(ctx, data)
 	if err != nil {
 		log.Printf("[ERROR] Failed to generate trade decision: %v", err)
 		return fmt.Errorf("failed to generate trade decision: %w", err)
 	}
-	log.Printf("[AI] Generated trade decision: action=%s confidence=%.2f reasoning=%s", 
-		decision.Action, decision.Confidence, decision.Reasoning)
+	log.Printf("[AI] Generated decision: action=%s confidence=%.2f reasoning=%s (took %v)", 
+		decision.Action, decision.Confidence, decision.Reasoning, time.Since(aiStart))
 
 	// Create trade with risk validation
 	trade := &risk.Trade{
@@ -95,13 +102,16 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		Price:     data.Price,
 	}
 
+	riskStart := time.Now()
 	if err := e.riskMgr.ValidateTrade(ctx, trade); err != nil {
 		log.Printf("[RISK] Trade validation failed: %v", err)
 		return fmt.Errorf("trade validation failed: %w", err)
 	}
-	log.Printf("[RISK] Trade validated successfully")
+	log.Printf("[RISK] Trade validated successfully (took %v)", time.Since(riskStart))
 
-	// Execute order through Jupiter DEX
+	// Track swap execution time
+	swapStart := time.Now()
+	// Execute order through Jupiter DEX with wallet
 	if err := e.jupiter.ExecuteOrder(exchange.Order{
 		Symbol:    token,
 		Side:      decision.Action,
@@ -113,7 +123,8 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		log.Printf("[ERROR] Swap execution failed: %v", err)
 		return fmt.Errorf("swap execution failed: %w", err)
 	}
-	log.Printf("[TRADE] Successfully executed %s order for %s", decision.Action, token)
+	log.Printf("[TRADE] Successfully executed %s order for %s (swap took %v)", 
+		decision.Action, token, time.Since(swapStart))
 
 	// Update position tracking
 	switch decision.Action {
