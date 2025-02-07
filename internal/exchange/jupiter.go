@@ -115,14 +115,19 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		UserPublicKey: wallet.GetPublicKey(),
 	}
 
-	resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", nil)
+	swapBody, err := json.Marshal(swapReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal swap request: %w", err)
+	}
+
+	swapResp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(swapBody))
 	if err != nil {
 		return fmt.Errorf("failed to execute swap: %w", err)
 	}
-	defer resp.Body.Close()
+	defer swapResp.Body.Close()
 
-	var swap SwapResponse
-	if err := json.NewDecoder(resp.Body).Decode(&swap); err != nil {
+	var swapResult SwapResponse
+	if err := json.NewDecoder(swapResp.Body).Decode(&swapResult); err != nil {
 		return fmt.Errorf("failed to decode swap response: %w", err)
 	}
 

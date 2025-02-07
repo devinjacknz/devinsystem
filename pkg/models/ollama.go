@@ -107,7 +107,7 @@ Timestamp: %s`, data.Symbol, data.Price, data.Volume, data.Timestamp.Format(time
 		Confidence: confidence,
 		Reasoning:  reasoning,
 		Model:     c.model,
-		Timestamp: time.Now()
+		Timestamp: time.Now(),
 	}
 
 	return tradeDecision, nil
