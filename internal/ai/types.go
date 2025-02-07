@@ -14,6 +14,14 @@ type RiskAnalysis struct {
 	Confidence    float64
 }
 
+type Analysis struct {
+	Action     string
+	Confidence float64
+	Reasoning  string
+	Model      string
+	Timestamp  time.Time
+}
+
 type Service interface {
 	AnalyzeMarket(data MarketData) (*Analysis, error)
 	AnalyzeRisk(data MarketData) (*RiskAnalysis, error)
