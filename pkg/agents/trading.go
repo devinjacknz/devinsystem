@@ -16,7 +16,7 @@ type TradingAgent struct {
 	*BaseAgent
 	marketData market.Client
 	ollama    models.Client
-	riskMgr   *risk.Manager
+	riskMgr   risk.Manager
 	jupiter   *exchange.JupiterDEX
 	stopChan  chan struct{}
 }

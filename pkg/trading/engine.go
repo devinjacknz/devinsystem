@@ -25,13 +25,12 @@ type Engine struct {
 	positions   map[string]float64
 }
 
-func NewEngine(marketData market.Client, ollama models.Client, riskMgr *risk.Manager, tokenCache *utils.TokenCache, walletMgr wallet.Manager) *Engine {
+func NewEngine(marketData market.Client, ollama models.Client, riskMgr risk.Manager, tokenCache *utils.TokenCache) *Engine {
 	return &Engine{
 		marketData: marketData,
 		ollama:    ollama,
 		riskMgr:   riskMgr,
 		tokenCache: tokenCache,
-		wallet:     walletMgr,
 		jupiter:    exchange.NewJupiterDEX(),
 		stopChan:  make(chan struct{}),
 		positions: make(map[string]float64),

@@ -14,7 +14,7 @@ type KeyStore interface {
 
 type Manager interface {
 	CreateWallet(walletType WalletType) error
-	GetWallet(walletType WalletType) (Wallet, error)
+	GetWallet(walletType WalletType) (*SolanaWallet, error)
 	TransferFunds(from, to WalletType, amount float64) error
 }
 
