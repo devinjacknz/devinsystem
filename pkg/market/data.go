@@ -34,7 +34,7 @@ func (c *JupiterClient) GetPrice(ctx context.Context, token string) (float64, er
 		return 0, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	url := fmt.Sprintf("https://price.jup.ag/v4/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token)
+	url := fmt.Sprintf("https://api.jup.ag/api/v4/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
@@ -72,7 +72,7 @@ func (c *JupiterClient) GetVolume(ctx context.Context, token string) (float64, e
 		return 0, fmt.Errorf("rate limit exceeded: %w", err)
 	}
 
-	url := fmt.Sprintf("https://stats.jup.ag/v4/token-volume?mint=%s", token)
+	url := fmt.Sprintf("https://api.jup.ag/api/v4/token-volume?mint=%s", token)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
