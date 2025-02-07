@@ -14,6 +14,7 @@ import (
 	"github.com/devinjacknz/devinsystem/pkg/market"
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/utils"
+	"github.com/devinjacknz/devinsystem/pkg/utils/config"
 )
 
 type Engine struct {
@@ -68,30 +69,30 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	defer func() {
-		log.Printf("[PERF] Trade execution for %s took %v", token, time.Since(start))
+		log.Printf("%s Trade execution for %s took %v", utils.LogMarkerPerf, token, time.Since(start))
 	}()
 
-	log.Printf("[TRADE] Starting trade execution for %s, amount: %.4f using wallet: %s", 
+	log.Printf("%s Starting trade execution for %s, amount: %.4f using wallet: %s", utils.LogMarkerTrade, 
 		token, amount, os.Getenv("WALLET"))
 
 	// Get market data with timing
 	marketStart := time.Now()
 	data, err := e.marketData.GetMarketData(ctx, token)
 	if err != nil {
-		log.Printf("[ERROR] Failed to get market data: %v", err)
+		log.Printf("%s Failed to get market data: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to get market data: %w", err)
 	}
-	log.Printf("[MARKET] Retrieved data for %s: price=%.4f volume=%.2f (took %v)", 
+	log.Printf("%s Retrieved data for %s: price=%.4f volume=%.2f (took %v)", utils.LogMarkerMarket, 
 		token, data.Price, data.Volume, time.Since(marketStart))
 
 	// Get AI decision with timing
 	aiStart := time.Now()
 	decision, err := e.ollama.GenerateTradeDecision(ctx, data)
 	if err != nil {
-		log.Printf("[ERROR] Failed to generate trade decision: %v", err)
+		log.Printf("%s Failed to generate trade decision: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to generate trade decision: %w", err)
 	}
-	log.Printf("[AI] Generated decision: action=%s confidence=%.2f reasoning=%s (took %v)", 
+	log.Printf("%s Generated decision: action=%s confidence=%.2f reasoning=%s (took %v)", utils.LogMarkerAI, 
 		decision.Action, decision.Confidence, decision.Reasoning, time.Since(aiStart))
 
 	// Create trade with risk validation
@@ -104,10 +105,10 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 
 	riskStart := time.Now()
 	if err := e.riskMgr.ValidateTrade(ctx, trade); err != nil {
-		log.Printf("[RISK] Trade validation failed: %v", err)
+		log.Printf("%s Trade validation failed: %v", utils.LogMarkerRisk, err)
 		return fmt.Errorf("trade validation failed: %w", err)
 	}
-	log.Printf("[RISK] Trade validated successfully (took %v)", time.Since(riskStart))
+	log.Printf("%s Trade validated successfully (took %v)", utils.LogMarkerRisk, time.Since(riskStart))
 
 	// Track swap execution time
 	swapStart := time.Now()
@@ -120,20 +121,20 @@ func (e *Engine) ExecuteTrade(ctx context.Context, token string, amount float64)
 		OrderType: "MARKET",
 		Wallet:    os.Getenv("WALLET"),
 	}); err != nil {
-		log.Printf("[ERROR] Swap execution failed: %v", err)
+		log.Printf("%s Swap execution failed: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("swap execution failed: %w", err)
 	}
-	log.Printf("[TRADE] Successfully executed %s order for %s (swap took %v)", 
+	log.Printf("%s Successfully executed %s order for %s (swap took %v)", utils.LogMarkerTrade, 
 		decision.Action, token, time.Since(swapStart))
 
 	// Update position tracking
 	switch decision.Action {
 	case "BUY":
 		e.positions[token] += amount
-		log.Printf("[POSITION] Updated %s position to %.4f", token, e.positions[token])
+		log.Printf("%s Updated %s position to %.4f", utils.LogMarkerTrade, token, e.positions[token])
 	case "SELL":
 		e.positions[token] = 0
-		log.Printf("[POSITION] Closed position for %s", token)
+		log.Printf("%s Closed position for %s", utils.LogMarkerTrade, token)
 	}
 
 	return nil
@@ -171,7 +172,7 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 
 		decision, err := e.ollama.GenerateTradeDecision(ctx, data)
 		if err != nil {
-			log.Printf("[ERROR] Failed to generate decision for %s: %v", token.Symbol, err)
+			log.Printf("%s Failed to generate decision for %s: %v", utils.LogMarkerError, token.Symbol, err)
 			continue
 		}
 
@@ -187,19 +188,19 @@ func (e *Engine) processMarketData(ctx context.Context) error {
 
 			var executed bool
 			for attempt := 1; attempt <= 3; attempt++ {
-				log.Printf("[RETRY] Attempting trade %d/3 for %s %s", attempt, decision.Action, token.Symbol)
+				log.Printf("%s Attempting trade %d/3 for %s %s", utils.LogMarkerRetry, attempt, decision.Action, token.Symbol)
 				if err := e.ExecuteTrade(ctx, token.Symbol, amount); err != nil {
-					log.Printf("[RETRY] Trade attempt %d failed: %v", attempt, err)
+					log.Printf("%s Trade attempt %d failed: %v", utils.LogMarkerRetry, attempt, err)
 					time.Sleep(time.Second)
 					continue
 				}
-				log.Printf("[TRADE] Successfully executed %s order for %s, amount: %.4f, confidence: %.2f", 
+				log.Printf("%s Successfully executed %s order for %s, amount: %.4f, confidence: %.2f", utils.LogMarkerTrade, 
 					decision.Action, token.Symbol, amount, decision.Confidence)
 				executed = true
 				break
 			}
 			if !executed {
-				log.Printf("[ERROR] All retry attempts failed for %s %s", decision.Action, token.Symbol)
+				log.Printf("%s All retry attempts failed for %s %s", utils.LogMarkerError, decision.Action, token.Symbol)
 			}
 		}
 	}
