@@ -84,7 +84,7 @@ func (j *JupiterDEX) GetQuote(ctx context.Context, inputMint, outputMint string,
 
 	log.Printf("%s Starting quote request with wallet: %s", utils.LogMarkerWallet, os.Getenv("WALLET"))
 
-		resp, err := j.client.Post("https://quote-api.jup.ag/v1/quote", "application/json", bytes.NewReader(body))
+		resp, err := j.client.Post("https://quote-api.jup.ag/v6/quote", "application/json", bytes.NewReader(body))
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get quote: %w", err)
 			backoff := time.Duration(attempt) * retryDelay
@@ -127,6 +127,11 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 		log.Printf("%s Order execution took %v", utils.LogMarkerPerf, time.Since(start))
 	}()
 
+	if order.Amount <= 0 || order.Price <= 0 {
+		log.Printf("%s Invalid order amount or price: amount=%.8f price=%.8f", utils.LogMarkerError, order.Amount, order.Price)
+		return fmt.Errorf("invalid order amount or price")
+	}
+
 	if err := j.limiter.Wait(ctx); err != nil {
 		log.Printf("%s Rate limit exceeded: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("rate limit exceeded: %w", err)
@@ -136,11 +141,11 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 	swapReq := &SwapRequest{
 		QuoteResponse: QuoteResponse{
 			InputMint:  order.Symbol,
-			OutputMint: "USDC",
-			InAmount:   fmt.Sprintf("%.0f", order.Amount),
+			OutputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+			InAmount:   fmt.Sprintf("%.0f", order.Amount * 1e9), // Convert to lamports
 		},
 		UserPublicKey: order.Wallet,
-		SlippageBps:  50, // 0.5% slippage tolerance
+		SlippageBps:  100, // 1% slippage tolerance
 	}
 
 	body, err := json.Marshal(swapReq)
@@ -151,7 +156,7 @@ func (j *JupiterDEX) ExecuteOrder(order Order) error {
 
 	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
-		resp, err := j.client.Post("https://swap-api.jup.ag/v1/swap", "application/json", bytes.NewReader(body))
+		resp, err := j.client.Post("https://quote-api.jup.ag/v6/swap", "application/json", bytes.NewReader(body))
 		if err != nil {
 			lastErr = err
 			backoff := time.Duration(attempt) * retryDelay
@@ -196,28 +201,41 @@ func (j *JupiterDEX) GetMarketPrice(token string) (float64, error) {
 	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
 		var httpResp *http.Response
-		httpResp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v1/price/%s", token))
+		httpResp, err := j.client.Get(fmt.Sprintf("https://price-api.jup.ag/v6/price?ids=%s&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", token))
 		if err != nil {
 			lastErr = err
 			backoff := time.Duration(attempt) * retryDelay
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}
+			log.Printf("%s Price fetch attempt %d/%d failed: %v, retrying in %v", utils.LogMarkerRetry,
+				attempt, retryAttempts, err, backoff)
 			time.Sleep(backoff)
 			continue
 		}
 
-		var price struct {
-			Price float64 `json:"price"`
+		var priceResp struct {
+			Data map[string]struct {
+				Price float64 `json:"price"`
+			} `json:"data"`
 		}
-		err = json.NewDecoder(httpResp.Body).Decode(&price)
+		err = json.NewDecoder(httpResp.Body).Decode(&priceResp)
 		httpResp.Body.Close()
 		if err != nil {
-			lastErr = err
+			lastErr = fmt.Errorf("failed to decode price response: %w", err)
 			continue
 		}
 
-		return price.Price, nil
+		if priceData, ok := priceResp.Data[token]; ok {
+			if priceData.Price <= 0 {
+				lastErr = fmt.Errorf("invalid price: %.8f", priceData.Price)
+				continue
+			}
+			log.Printf("%s Retrieved price for %s: %.8f USDC", utils.LogMarkerMarket, token, priceData.Price)
+			return priceData.Price, nil
+		}
+		lastErr = fmt.Errorf("token %s not found in price response", token)
+		continue
 	}
 
 	return 0, fmt.Errorf("failed to get market price after %d attempts: %w", retryAttempts, lastErr)
