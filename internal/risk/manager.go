@@ -24,7 +24,6 @@ type Trade struct {
 }
 
 type Manager interface {
-	ValidateOrder(order Order) error
 	ValidateTrade(ctx context.Context, trade *Trade) error
 	CheckExposure(symbol string) (float64, error)
 	UpdateStopLoss(symbol string, currentPrice float64) error
@@ -70,18 +69,18 @@ func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
 	}
 
 	// Set stop loss based on AI recommendation
-	if err := rm.stopLoss.SetStopLoss(order.Symbol, riskAnalysis.StopLossPrice); err != nil {
+	if err := rm.stopLoss.SetStopLoss(trade.Token, riskAnalysis.StopLossPrice); err != nil {
 		return fmt.Errorf("failed to set stop loss: %w", err)
 	}
 
 	// Check exposure
-	exposure, err := rm.CheckExposure(order.Symbol)
+	exposure, err := rm.CheckExposure(trade.Token)
 	if err != nil {
 		return fmt.Errorf("failed to check exposure: %w", err)
 	}
 
-	if exposure+order.Amount > rm.maxExposure {
-		return fmt.Errorf("order would exceed maximum exposure")
+	if exposure+trade.Amount > rm.maxExposure {
+		return fmt.Errorf("trade would exceed maximum exposure")
 	}
 
 	return nil
