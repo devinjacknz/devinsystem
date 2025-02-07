@@ -18,11 +18,14 @@ import (
 
 type HeliusClient struct {
 	rpcEndpoint string
+	fallbackRPC string
 	httpClient  *http.Client
 	limiter     *rate.Limiter
 	mu          sync.RWMutex
 	failures    int32
 	lastFailure time.Time
+	cache       map[string]*MarketData
+	cacheTTL    time.Duration
 }
 
 type rpcRequest struct {
@@ -56,11 +59,17 @@ func NewHeliusClient(rpcEndpoint string) Client {
 	if rpcEndpoint == "" {
 		rpcEndpoint = os.Getenv("RPC_ENDPOINT")
 	}
+	// Use Eclipse RPC as fallback
+	eclipseRPC := "https://eclipse.helius-rpc.com/"
+	
 	return &HeliusClient{
 		rpcEndpoint: rpcEndpoint,
+		fallbackRPC: eclipseRPC,
 		httpClient:  &http.Client{Timeout: 3 * time.Second},
 		limiter:     rate.NewLimiter(rate.Every(time.Second), 1), // 1 RPS for free plan
 		mu:          sync.RWMutex{},
+		cache:       make(map[string]*MarketData),
+		cacheTTL:    5 * time.Minute,
 	}
 }
 
@@ -69,6 +78,16 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	defer func() {
 		log.Printf("%s Market data retrieval for %s took %v", logging.LogMarkerPerf, token, time.Since(start))
 	}()
+
+	c.mu.RLock()
+	if cached, ok := c.cache[token]; ok {
+		if time.Since(cached.Timestamp) < c.cacheTTL {
+			c.mu.RUnlock()
+			log.Printf("%s Using cached data for %s", logging.LogMarkerMarket, token)
+			return cached, nil
+		}
+	}
+	c.mu.RUnlock()
 
 	if err := c.limiter.Wait(ctx); err != nil {
 		log.Printf("%s Rate limit exceeded for %s: %v", logging.LogMarkerError, token, err)
@@ -103,6 +122,11 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	log.Printf("%s Retrieved data for %s: Price=%.8f Volume=%.2f Time=%s", logging.LogMarkerMarket,
 		token, price, volume, timestamp.Format(time.RFC3339))
 
+	// Update cache
+	c.mu.Lock()
+	c.cache[token] = data
+	c.mu.Unlock()
+
 	// Save market data
 	if err := c.SaveMarketData(ctx, data); err != nil {
 		return nil, fmt.Errorf("failed to save market data: %w", err)
@@ -135,7 +159,11 @@ func (c *HeliusClient) getTokenSupply(ctx context.Context, token string) (uint64
 
 	var response rpcResponse
 	if err := c.doRequest(ctx, request, &response); err != nil {
-		return 0, err
+		log.Printf("%s Primary RPC failed, trying fallback: %v", logging.LogMarkerRetry, err)
+		request.ID++ // Increment request ID for retry
+		if err := c.doRequestWithEndpoint(ctx, c.fallbackRPC, request, &response); err != nil {
+			return 0, err
+		}
 	}
 
 	var supply tokenAccountBalance
@@ -170,7 +198,11 @@ func (c *HeliusClient) getLargestTokenHolders(ctx context.Context, token string)
 }
 
 func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, response *rpcResponse) error {
-	log.Printf("%s Making request: method=%s", logging.LogMarkerSystem, request.Method)
+	return c.doRequestWithEndpoint(ctx, c.rpcEndpoint, request, response)
+}
+
+func (c *HeliusClient) doRequestWithEndpoint(ctx context.Context, endpoint string, request rpcRequest, response *rpcResponse) error {
+	log.Printf("%s Making request to %s: method=%s", logging.LogMarkerSystem, endpoint, request.Method)
 	
 	body, err := json.Marshal(request)
 	if err != nil {
@@ -179,7 +211,7 @@ func (c *HeliusClient) doRequest(ctx context.Context, request rpcRequest, respon
 	}
 
 	for attempt := 1; attempt <= 5; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, "POST", c.rpcEndpoint, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(body))
 		if err != nil {
 			log.Printf("%s Failed to create RPC request: %v", logging.LogMarkerError, err)
 			return fmt.Errorf("failed to create request: %w", err)
