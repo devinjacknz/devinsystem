@@ -68,14 +68,23 @@ func (c *TokenCache) Set(token string, info *TokenInfo) {
 }
 
 func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
+	start := time.Now()
+	defer func() {
+		log.Printf("%s Token cache operation took %v", utils.LogMarkerPerf, time.Since(start))
+	}()
+
+	log.Printf("%s Checking token cache status", utils.LogMarkerSystem)
 	c.mu.RLock()
 	expired := time.Now().After(c.expires)
 	c.mu.RUnlock()
 
 	if expired {
+		log.Printf("%s Token cache expired, refreshing...", utils.LogMarkerSystem)
 		if err := c.Refresh(ctx); err != nil {
+			log.Printf("%s Failed to refresh token cache: %v", utils.LogMarkerError, err)
 			return nil, err
 		}
+		log.Printf("%s Token cache refreshed successfully", utils.LogMarkerSystem)
 	}
 
 	c.mu.RLock()
@@ -98,12 +107,19 @@ func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
 }
 
 func (c *TokenCache) Refresh(ctx context.Context) error {
+	start := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	defer func() {
+		log.Printf("%s Token cache refresh took %v", utils.LogMarkerPerf, time.Since(start))
+	}()
 
 	if !time.Now().After(c.expires) {
+		log.Printf("%s Token cache still valid, skipping refresh", utils.LogMarkerSystem)
 		return nil
 	}
+	
+	log.Printf("%s Starting token cache refresh", utils.LogMarkerSystem)
 
 	for token := range c.tokens {
 		if err := c.limiter.Wait(ctx); err != nil {
