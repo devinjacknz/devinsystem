@@ -69,7 +69,7 @@ func (c *TokenCache) Set(token string, info *TokenInfo) {
 	c.tokens[token] = info
 }
 
-func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
+func (c *TokenCache) GetTopTokens(ctx context.Context) ([]string, error) {
 	start := time.Now()
 	defer func() {
 		log.Printf("%s Token cache operation took %v", logging.LogMarkerPerf, time.Since(start))
@@ -92,14 +92,10 @@ func (c *TokenCache) GetTopTokens(ctx context.Context) ([]*TokenInfo, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	tokens := make([]*TokenInfo, 0, len(c.tokens))
-	for _, info := range c.tokens {
-		tokens = append(tokens, info)
+	tokens := make([]string, 0, len(c.tokens))
+	for symbol := range c.tokens {
+		tokens = append(tokens, symbol)
 	}
-
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i].Volume > tokens[j].Volume
-	})
 
 	if len(tokens) > c.maxTokens {
 		tokens = tokens[:c.maxTokens]
