@@ -68,7 +68,22 @@ func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
 		log.Printf("%s Risk validation took %v", utils.LogMarkerPerf, time.Since(start))
 	}()
 
+	if trade == nil {
+		log.Printf("%s Invalid trade: nil trade object", utils.LogMarkerError)
+		return fmt.Errorf("invalid trade: nil trade object")
+	}
+
+	if trade.Token == "" {
+		log.Printf("%s Invalid trade: empty token", utils.LogMarkerError)
+		return fmt.Errorf("invalid trade: empty token")
+	}
+
 	log.Printf("%s Validating trade: %+v", utils.LogMarkerRisk, trade)
+
+	if rm.aiService == nil {
+		log.Printf("%s AI service not initialized", utils.LogMarkerError)
+		return fmt.Errorf("ai service not initialized")
+	}
 
 	// Check AI risk analysis
 	riskAnalysis, err := rm.aiService.AnalyzeRisk(ai.MarketData{
@@ -78,6 +93,11 @@ func (rm *RiskManager) ValidateTrade(ctx context.Context, trade *Trade) error {
 	if err != nil {
 		log.Printf("%s Failed to analyze risk: %v", utils.LogMarkerError, err)
 		return fmt.Errorf("failed to analyze risk: %w", err)
+	}
+
+	if rm.stopLoss == nil {
+		log.Printf("%s Stop loss manager not initialized", utils.LogMarkerError)
+		return fmt.Errorf("stop loss manager not initialized")
 	}
 
 	// Set stop loss based on AI recommendation
