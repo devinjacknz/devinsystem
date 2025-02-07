@@ -4,20 +4,6 @@ import (
 	"sync"
 )
 
-type Analysis struct {
-	Symbol     string
-	Trend      string
-	Confidence float64
-	Signals    []Signal
-}
-
-type Signal struct {
-	Type       string
-	Symbol     string
-	Action     string
-	Confidence float64
-}
-
 type AIService struct {
 	mu            sync.RWMutex
 	ollamaClient  *OllamaClient
