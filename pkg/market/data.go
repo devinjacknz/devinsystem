@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"time"
@@ -73,7 +72,7 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 		if err := json.Unmarshal(response.Result, &account); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal account: %w", err)
 		}
-		price = float64(account.Value.Lamports) / 1e9 // Convert lamports to SOL
+		price = float64(account.Value.Lamports) / 1000000000 // Convert lamports to SOL
 		if price <= 0 {
 			log.Printf("%s Invalid SOL price from account: %.8f", logging.LogMarkerError, price)
 			price = 100.0 // Default SOL price in USD
