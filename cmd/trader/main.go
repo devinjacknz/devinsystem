@@ -13,6 +13,7 @@ import (
 	"github.com/devinjacknz/devinsystem/pkg/models"
 	"github.com/devinjacknz/devinsystem/pkg/trading"
 	"github.com/devinjacknz/devinsystem/pkg/logging"
+	"github.com/devinjacknz/devinsystem/pkg/utils"
 )
 
 func main() {
