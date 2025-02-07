@@ -39,14 +39,12 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 	// For SOL token, use getBalance instead of getTokenSupply
 	var request rpcRequest
 	if token == "So11111111111111111111111111111111111111112" {
-		// For SOL token, use getAccountInfo
+		// For SOL token, use getBalance
 		request = rpcRequest{
 			Jsonrpc: "2.0",
 			ID:      1,
-			Method:  "getAccountInfo",
-			Params:  []interface{}{os.Getenv("WALLET"), map[string]interface{}{
-				"encoding": "jsonParsed",
-			}},
+			Method:  "getBalance",
+			Params:  []interface{}{os.Getenv("WALLET")},
 		}
 	} else {
 		request = rpcRequest{
@@ -64,17 +62,13 @@ func (c *HeliusClient) GetMarketData(ctx context.Context, token string) (*Market
 
 	var price float64
 	if token == "So11111111111111111111111111111111111111112" {
-		var account struct {
-			Value struct {
-				Lamports uint64 `json:"lamports"`
-			} `json:"value"`
+		var balance uint64
+		if err := json.Unmarshal(response.Result, &balance); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
 		}
-		if err := json.Unmarshal(response.Result, &account); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account: %w", err)
-		}
-		price = float64(account.Value.Lamports) / 1000000000 // Convert lamports to SOL
+		price = float64(balance) / 1000000000 // Convert lamports to SOL
 		if price <= 0 {
-			log.Printf("%s Invalid SOL price from account: %.8f", logging.LogMarkerError, price)
+			log.Printf("%s Invalid SOL price from balance: %.8f", logging.LogMarkerError, price)
 			price = 100.0 // Default SOL price in USD
 		}
 	} else {
